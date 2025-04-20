@@ -1,4 +1,4 @@
-package com.example.cubearia.game;
+package com.example.cubearia.game.inventory;
 
 public class ItemStack {
     private final Item item;

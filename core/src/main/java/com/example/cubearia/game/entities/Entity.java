@@ -1,14 +1,13 @@
-package com.example.cubearia.game;
+package com.example.cubearia.game.entities;
 
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Rectangle;
 
-import java.awt.*;
-
 public abstract class Entity {
     public float x;
     public float y;
-    protected float width, height;
+    public float width;
+    public float height;
     protected boolean toRemove = false;
 
     public Entity(float x, float y, float width, float height) {

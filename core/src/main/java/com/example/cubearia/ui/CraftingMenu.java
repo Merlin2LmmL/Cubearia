@@ -8,7 +8,7 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
 public class CraftingMenu {
     private Stage stage;
-    private Skin skin; // Eine Skin-Datei für UI-Elemente (kann als JSON definiert werden)
+    private Skin skin;
 
     public CraftingMenu() {
         stage = new Stage(new ScreenViewport());
@@ -19,8 +19,6 @@ public class CraftingMenu {
     private void createMenu() {
         Table table = new Table();
         table.setFillParent(true);
-        // Hier platzierst du z.B. Buttons und Labels, die die Crafting-Rezepte anzeigen.
-        // table.add( ... );
         stage.addActor(table);
     }
 

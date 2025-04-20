@@ -4,9 +4,8 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.example.cubearia.game.Inventory;
-import com.example.cubearia.game.ItemStack;
+import com.example.cubearia.game.inventory.Inventory;
+import com.example.cubearia.game.inventory.ItemStack;
 
 public class InventoryUI {
     private final Inventory inventory;

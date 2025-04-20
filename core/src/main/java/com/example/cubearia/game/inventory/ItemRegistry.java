@@ -1,7 +1,9 @@
-package com.example.cubearia.game;
+package com.example.cubearia.game.inventory;
 
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.example.cubearia.game.world.BlockType;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -10,7 +12,7 @@ public class ItemRegistry {
 
     public static void init(TextureAtlas blockAtlas) {
         for (BlockType block : BlockType.values()) {
-            if (block == BlockType.AIR || block == BlockType.WATER_FULL || block == BlockType.WATER_SURFACE)
+            if (block == BlockType.AIR || block == BlockType.WATER)
                 continue; // nicht als Items
 
             String id = block.name().toLowerCase(); // z.B. "stone"

@@ -1,4 +1,4 @@
-package com.example.cubearia.game;
+package com.example.cubearia.game.inventory;
 
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 

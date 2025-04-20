@@ -1,14 +1,12 @@
 package com.example.cubearia.ui;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Vector2;
-import com.example.cubearia.game.BlockType;
-import com.example.cubearia.game.Player;
-import com.example.cubearia.game.Chunk;
-import com.example.cubearia.game.World;
+import com.example.cubearia.game.world.BlockType;
+import com.example.cubearia.game.entities.Player;
+import com.example.cubearia.game.world.World;
 
 /**
  * Einfache DebugRenderer-Klasse, die Spieler-Position und FPS
@@ -65,7 +63,7 @@ public class DebugRenderer {
 
         // BIOME
         font.draw(batch,
-            String.format("FPS: %s", world.getBiomeTypeAt((int) player.x)),
+            String.format("Biome: %s", world.getBiomeTypeAt((int) player.x)),
             x, (y - font.getLineHeight() * 3)
         );
     }

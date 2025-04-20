@@ -1,7 +1,11 @@
-package com.example.cubearia.game;
+package com.example.cubearia.game.inventory;
 
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Rectangle;
+import com.example.cubearia.game.entities.Entity;
+import com.example.cubearia.game.GameScreen;
+import com.example.cubearia.game.entities.Player;
+import com.example.cubearia.game.world.World;
 
 public class DroppedItem extends Entity {
     private final World world;      // referenz auf die Welt

@@ -1,6 +1,8 @@
 package com.example.cubearia.game;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -11,6 +13,7 @@ public class Assets {
     public static TextureAtlas   blockAtlas;        // ← new
     public static Texture        playerTexture;
     public static Texture        slotBackground;
+    public static Texture        blackPixel;
 
     public static TextureRegion[] breakingFrames;
     public static Animation<TextureRegion> breakingAnimation;
@@ -18,6 +21,13 @@ public class Assets {
     public static void load() {
         // 1) Load your raw block PNG
         blockTexture    = new Texture(Gdx.files.internal("Blocks.png"));
+
+        // Black‑Pixel generieren
+        Pixmap pix = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pix.setColor(Color.BLACK);
+        pix.fill();
+        blackPixel = new Texture(pix);
+        pix.dispose();
 
         // 2) Wrap the *entire* sheet as one atlas‐region named "tiles"
         blockAtlas      = new TextureAtlas();

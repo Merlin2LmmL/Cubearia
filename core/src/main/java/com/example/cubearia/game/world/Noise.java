@@ -1,4 +1,4 @@
-package com.example.cubearia.game;
+package com.example.cubearia.game.world;
 
 import java.util.Random;
 

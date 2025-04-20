@@ -1,4 +1,4 @@
-package com.example.cubearia.game;
+package com.example.cubearia.game.entities;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -7,6 +7,13 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
+import com.example.cubearia.game.Assets;
+import com.example.cubearia.game.GameScreen;
+import com.example.cubearia.game.Settings;
+import com.example.cubearia.game.inventory.Inventory;
+import com.example.cubearia.game.inventory.Item;
+import com.example.cubearia.game.world.BlockType;
+import com.example.cubearia.game.world.World;
 
 public class Player extends Entity {
     private final OrthographicCamera camera;
@@ -20,7 +27,7 @@ public class Player extends Entity {
     public final float moveAcceleration = 30f;
     public final float airControlFactor = 0.4f;
     public final float friction = 100f;
-    public final float maxSpeed = 6f;
+    public float finalmaxSpeed = 6f;
     public final int range = 5;
 
 
@@ -51,6 +58,7 @@ public class Player extends Entity {
         this.world = world;
         this.camera = camera;
         this.inventory = inventory;
+        inventory.addItem(Item.valueOf("DIRT"), 641);
         // Prepare texture regions
         headRegion = new TextureRegion(Assets.playerTexture, 6, 0, 8, 8);
         bodyRegion = new TextureRegion(Assets.playerTexture, 0, 0, 6, 12);
@@ -84,34 +92,35 @@ public class Player extends Entity {
             }
         }
 
-        float accel = moveAcceleration * delta;
+        float accel = moveAcceleration * delta ;
         float airAccel = accel * airControlFactor;
 
         if (onGround) {
-            if (left) velocityX -= accel;
-            if (right) velocityX += accel;
+            if (left) velocityX -= accel * (facingLeft() ? 1f : 0.5f);
+            if (right) velocityX += accel * (facingLeft() ? 0.5f : 1f);
             if (!left && !right) applyFriction(delta);
         } else {
-            if (left) velocityX -= airAccel;
-            if (right) velocityX += airAccel;
+            if (left) velocityX -= airAccel * (facingLeft() ? 1f : 0.5f);
+            if (right) velocityX += airAccel * (facingLeft() ? 0.5f : 1f);
             if (!left && !right) applyFriction(delta / 10);
         }
-        if (onGround) velocityX = MathUtils.clamp(velocityX, -maxSpeed, maxSpeed); else
-        if (inWater) velocityX = MathUtils.clamp(velocityX, -maxSpeed * 0.5f, maxSpeed * 0.5f); else
-            velocityX = MathUtils.clamp(velocityX, -maxSpeed * 1.2f, maxSpeed * 1.2f);
+
+        float maxSpeed = onGround ? finalmaxSpeed : inWater ? finalmaxSpeed * 0.5f : finalmaxSpeed * 1.2f;
+        maxSpeed = ((facingLeft() ? true : false) == (left ? true : false)) ? maxSpeed : maxSpeed * 0.5f;
+        velocityX = MathUtils.clamp(velocityX, -maxSpeed, maxSpeed);
 
         if ((Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.SPACE))) {
             if (onGround) {
                 velocityY = jumpVelocity;
                 onGround = false;
             } else if (inWater) {
-                velocityY += 1f;
+                velocityY += 0.1f;
             }
         }
 
         if (inWater) {
             velocityY += gravity * 0.2f * delta; // weniger Gravitation im Wasser
-            if (world.getBlock((int) x, (int) (Math.round(y + 0.25f))) == BlockType.WATER_SURFACE) {
+            if (world.getBlock((int) x, (int) (Math.round(y + 0.25f))) == BlockType.WATER) {
                 velocityY = MathUtils.clamp(velocityY, -4f, 8f); // nicht zu schnell fallen
             } else {
                 velocityY = MathUtils.clamp(velocityY, -4f, 4f); // nicht zu schnell fallen
@@ -124,7 +133,7 @@ public class Player extends Entity {
         moveWithCollision(delta);
 
         // Umgebung ggf. neu laden
-        world.updateAroundPlayer(x, (int) camera.zoom + 1);
+        world.updateAroundPlayer(x);
     }
 
     // Hilfsmethode zur Bodenreibung
@@ -181,18 +190,30 @@ public class Player extends Entity {
     }
 
     private void checkWaterState() {
-        inWater = world.getBlock((int) x, (int) y) == BlockType.WATER_FULL || world.getBlock((int) x, (int) (Math.round(y + 0.25f))) == BlockType.WATER_SURFACE;
+        int ix = (int) Math.floor(x);
+        int iy = (int) Math.floor(y + 0.25f);  // je nachdem, wo sich dein Spieler „fühlt“
+
+        // 1) Bist du überhaupt in Wasser?
+        boolean atWaterLevel    = world.getBlock(ix, iy)     == BlockType.WATER;
+        boolean justAboveWater  = world.getBlock(ix, iy + 1) == BlockType.WATER;
+        inWater = atWaterLevel || justAboveWater;
     }
 
     public boolean isInRange(int blockX, int blockY) {
-        return Math.abs(blockX - x) <= range && Math.abs(blockY - y) <= range;
+        float dx = blockX - x;
+        float dy = blockY - y;
+        // prüft, ob (dx² + dy²) ≤ range²
+        return dx*dx + dy*dy <= range*range;
+    }
+
+    public boolean intersects(int globalX, int globalY) {
+        return (globalX == (int) x && globalY == (int) y) || (globalX == (int) x && globalY == (int) y + 1);
     }
 
     public void render(SpriteBatch batch) {
         float scale = GameScreen.TILE_SIZE / 16f;
         float baseX = x * GameScreen.TILE_SIZE;
         float baseY = y * GameScreen.TILE_SIZE;
-
 
         // Mausposition in Weltkoords
         Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
@@ -203,7 +224,7 @@ public class Player extends Entity {
         float headOffsetX= flip
             ? bodyRegion.getRegionWidth() + 4*scale - headSize
             : -1 * scale;
-        float headOffsetY= 22 * scale;
+        float headOffsetY = 22 * scale;
 
         // Position unten links zum Zeichnen
         float headX = baseX + headOffsetX;
@@ -217,14 +238,13 @@ public class Player extends Entity {
 
         // Winkel vom Pivot zum Cursor (±180°)
         float angleRad = (float)Math.atan2(
-            mouse.y - pivotY,
+            mouse.y - pivotY - 4,
             mouse.x - pivotX
         );
         float angleDeg = angleRad * MathUtils.radiansToDegrees;
 
         // Spiegelflage: wenn Cursor links vom Pivot
         boolean headFlip = mouse.x < pivotX;
-        float scaleX     = headFlip ? -1f : 1f;
         float dir = headFlip ? -1f : 1f;
 
         // Winkel anpassen, damit die Rotation ≤180° und optisch korrekt bleibt
@@ -242,7 +262,7 @@ public class Player extends Entity {
             headY,
             originX, originY,
             headSize, headSize,
-            scaleX, 1f,
+            dir, 1f,
             finalAngle
         );
 
@@ -254,12 +274,12 @@ public class Player extends Entity {
         // rechter Arm (hinten)
         batch.draw(
             rightarmRegion,
-            baseX + (headFlip ? bodyRegion.getRegionWidth() - 2*scale - 3*scale : 2*scale),
+            baseX + (headFlip ? 1 : 2 * scale),
             baseY + 8 * scale,
             3*scale/2f,10*scale,
             3*scale * 1.2f, 10*scale * 1.2f,
             dir, 1f,
-            0.5f - rightRot * 1.5f * (headFlip ? -1f : 1f)
+            rightRot * 1.5f * -dir
         );
 
         // Körper
@@ -276,35 +296,61 @@ public class Player extends Entity {
         // linkes Bein
         batch.draw(
             leftlegRegion,
-            baseX + (flip ? bodyRegion.getRegionWidth() - 0*scale - 3*scale : 0*scale),
+            baseX + (headFlip ? 3 : 0 * scale),
             baseY,
             3*scale/2f, 10*scale,
             3*scale, 10*scale,
             dir, 1f,
-            -leftRot * (headFlip ? -1f : 1f)
+            -leftRot
         );
 
         // rechtes Bein
         batch.draw(
             rightlegRegion,
-            baseX + (flip ? bodyRegion.getRegionWidth() - 3*scale - 3*scale : 3*scale),
+            baseX + (headFlip ? 0 : 3 * scale),
             baseY,
             3*scale/2f, 10*scale,
             3*scale, 10*scale,
             dir, 1f,
-            -rightRot * (headFlip ? -1f : 1f)
+            -rightRot
         );
 
         // linker Arm (vorne)
         batch.draw(
             leftarmRegion,
-            baseX + (flip ? bodyRegion.getRegionWidth() - 2*scale - 3*scale : 2*scale),
+            baseX + (headFlip ? 1 : 2 * scale),
             baseY + 8 * scale,
             3*scale/2f,10*scale,
             3*scale * 1.2f, 10*scale * 1.2f,
             dir, 1f,
-            0.5f + rightRot * 1.5f * (headFlip ? -1f : 1f)
+            rightRot * 1.5f * dir
         );
+    }
+
+    public boolean facingLeft() {
+        float scale = GameScreen.TILE_SIZE / 16f;
+        float baseX = x * GameScreen.TILE_SIZE;
+
+        // Mausposition in Weltkoords
+        Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+        camera.unproject(mouse);
+
+        // Kopf-Dimensionen & Offset
+        float headSize   = 8 * scale;
+        float headOffsetX= flip
+            ? bodyRegion.getRegionWidth() + 4*scale - headSize
+            : -1 * scale;
+        float headOffsetY = 22 * scale;
+
+        // Position unten links zum Zeichnen
+        float headX = baseX + headOffsetX;
+
+        // Pivot unten-Mitte
+        float originX = headSize / 2f;
+        float pivotX  = headX + originX;
+
+        // Spiegelflage: wenn Cursor links vom Pivot
+        return mouse.x < pivotX;
     }
 
     public Inventory getInventory() {

@@ -1,6 +1,8 @@
-package com.example.cubearia.game;
+package com.example.cubearia.game.world;
 
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.example.cubearia.game.Settings;
+import com.example.cubearia.game.entities.Entity;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,18 +44,16 @@ public class World {
         if (chunk == null) {
             int globalX = chunkX * Chunk.WIDTH;
             BiomeType biome = getBiomeTypeAt(globalX);
-            chunk = new Chunk(chunkX, biome);
+            chunk = new Chunk(chunkX, getBiomeTypeAt((int) (globalX - 16)), biome, getBiomeTypeAt((int) (globalX + 16)));
             chunks.put(chunkX, chunk);
         }
-        // Optional: Terrain neu generieren, falls nötig
-        // chunk.generateTerrain();
         return chunk;
     }
 
     // Aktualisierung der Chunks in der Nähe des Spielers
-    public void updateAroundPlayer(float playerX, int zoom) {
+    public void updateAroundPlayer(float playerX) {
         int centerChunk = (int)Math.floor(playerX / Chunk.WIDTH);
-        for (int dx = -2 * zoom; dx <= 2 * zoom; dx++) {
+        for (int dx = -2 * Settings.RENDERDISTANCE; dx <= 2 * Settings.RENDERDISTANCE; dx++) {
             int cx = centerChunk + dx;
             getOrCreateChunk(cx);
         }
@@ -82,6 +82,4 @@ public class World {
     public List<Entity> getEntities() {
         return entities;
     }
-
-
 }

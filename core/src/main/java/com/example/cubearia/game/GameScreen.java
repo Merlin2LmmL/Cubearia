@@ -6,6 +6,12 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
+import com.example.cubearia.game.entities.Player;
+import com.example.cubearia.game.inventory.*;
+import com.example.cubearia.game.world.BlockType;
+import com.example.cubearia.game.world.Chunk;
+import com.example.cubearia.game.world.Renderer;
+import com.example.cubearia.game.world.World;
 import com.example.cubearia.ui.DebugRenderer;
 import com.example.cubearia.ui.InventoryUI;
 
@@ -151,7 +157,7 @@ public class GameScreen implements Screen {
                 if (!isBreaking || globalX != breakingX || globalY != breakingY) {
                     breakingX = globalX;
                     breakingY = globalY;
-                    breakingTimeTotal = (float) (block.hardness * 0.4);
+                    breakingTimeTotal = (float) (block.hardness * 0.4f);
                     breakingTimer = 0f;
                     isBreaking = true;
                 } else {
@@ -181,7 +187,7 @@ public class GameScreen implements Screen {
 
     private void handleBlockPlacing() {
         // 1) Nur einmal pro Klick
-        if (!Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)) return;
+        if (!Gdx.input.isButtonPressed(Input.Buttons.RIGHT)) return;
 
         int globalX = getBlockGlobalXAtCursor();
         int globalY = getBlockGlobalYAtCursor();
@@ -192,6 +198,8 @@ public class GameScreen implements Screen {
         // 3) Nur auf Luft setzen
         if (world.getBlock(globalX, globalY) != BlockType.AIR) return;
 
+        if (player.intersects(globalX, globalY)) return;
+
         // 4) Aktuellen Slot auslesen
         int slotIndex = player.selectedSlot;
         ItemStack stack = inventory.getSlot(slotIndex);
@@ -200,7 +208,6 @@ public class GameScreen implements Screen {
         // 5) BlockType per Name mappen
         BlockType blockToPlace;
         blockToPlace = BlockType.valueOf(stack.getItem().getId().toUpperCase());
-
         // 6) Block setzen
         world.setBlock(globalX, globalY, blockToPlace);
 
@@ -229,32 +236,7 @@ public class GameScreen implements Screen {
         // Gegeben: Das Tilesheet ist in 4 Spalten angeordnet.
         final int COLUMNS = 4;
 
-        // Wiederhole für alle Chunks
-        for (int chunkX : world.chunks.keySet()) {
-            Chunk chunk = world.chunks.get(chunkX);
-            for (int x = 0; x < Chunk.WIDTH; x++) {
-                for (int y = 0; y < Chunk.HEIGHT; y++) {
-                    BlockType type = chunk.blocks[x][y];
-                    if (type == BlockType.AIR) continue;
-
-                    int tx = type.getTileX();
-                    int ty = type.getTileY();
-
-                    float sourceX = tx * TILE_SIZE;
-                    float sourceY = ty * TILE_SIZE;
-                    float destX = (chunkX * Chunk.WIDTH + x) * TILE_SIZE;
-                    float destY = y * TILE_SIZE;
-
-                    batch.draw(Assets.blockTexture,
-                        destX, destY,
-                        TILE_SIZE, TILE_SIZE,
-                        (int) sourceX, (int) sourceY, TILE_SIZE, TILE_SIZE,
-                        false, false);
-                }
-            }
-        }
-
-        world.renderEntities(batch);
+        Renderer.renderWorld(world, player, batch);
 
         if (isBreaking) {
             float progress = breakingTimer / breakingTimeTotal;
@@ -262,6 +244,8 @@ public class GameScreen implements Screen {
             TextureRegion currentFrame = Assets.breakingFrames[frameIndex];
             batch.draw(currentFrame, breakingX * TILE_SIZE, breakingY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
+
+        world.renderEntities(batch);
 
         batch.end();
 
@@ -271,7 +255,6 @@ public class GameScreen implements Screen {
         inventoryUI.render(batch, uiCamera, player.selectedSlot);
         debugRenderer.render(batch, player, getBlockAtCursor(), world);
         batch.end();
-
     }
 
     @Override
