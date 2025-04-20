@@ -13,6 +13,7 @@ public class Assets {
     public static TextureAtlas   blockAtlas;        // ← new
     public static Texture        playerTexture;
     public static Texture        slotBackground;
+    public static Texture        inventoryBackground;
     public static Texture        blackPixel;
 
     public static TextureRegion[] breakingFrames;
@@ -41,7 +42,8 @@ public class Assets {
 
         // 3) Everything else as before
         playerTexture   = new Texture(Gdx.files.internal("Player.png"));
-        slotBackground  = new Texture(Gdx.files.internal("ui/slotBackground.png"));
+        slotBackground  = new Texture(Gdx.files.internal("ui/SlotBackground.png"));
+        inventoryBackground  = new Texture(Gdx.files.internal("ui/InventoryBackground.png"));
 
         Texture breakingSheet = new Texture(Gdx.files.internal("BreakingAnimation.png"));
         breakingFrames = new TextureRegion[4];

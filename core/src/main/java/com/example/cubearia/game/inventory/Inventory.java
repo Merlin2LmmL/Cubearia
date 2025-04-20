@@ -2,25 +2,28 @@ package com.example.cubearia.game.inventory;
 
 public class Inventory {
     private final ItemStack[] slots;
-    private final int size;
+    private final int columns;
+    private final int rows;
 
-    public Inventory(int size) {
-        this.size = size;
-        this.slots = new ItemStack[size];
-        for (int i = 0; i < size; i++) {
-            slots[i] = null; // leere Slots
-        }
+    public Inventory(int columns, int rows) {
+        this.columns = columns;
+        this.rows = rows;
+        this.slots = new ItemStack[columns * rows];
     }
 
     /**
-     * Versucht, `amount` Items in das Inventar zu packen.
-     * @return Anzahl der Items, die nicht mehr untergebracht werden konnten.
+     * Versucht, `amount` Items vom Typ `item` einzufügen.
+     * @param item   der Item-Typ
+     * @param amount Anzahl der einzufügenden Items
+     * @return 0, wenn alle Items eingefügt wurden; sonst Anzahl der Items, die nicht untergekommen sind
      */
-    public void addItem(Item item, int amount) {
+    public int addItem(Item item, int amount) {
         // 1) Erst vorhandene Stacks befüllen
-        for (int i = 0; i < slots.length; i++) {
+        for (int i = 0; i < slots.length && amount > 0; i++) {
             ItemStack stack = slots[i];
-            if (stack != null && stack.getItem().equals(item) && stack.getAmount() < item.getMaxStackSize()) {
+            if (stack != null
+                    && stack.getItem().equals(item)
+                    && stack.getAmount() < item.getMaxStackSize()) {
                 int space = item.getMaxStackSize() - stack.getAmount();
                 int toAdd = Math.min(space, amount);
                 stack.increase(toAdd);
@@ -36,19 +39,30 @@ public class Inventory {
                 amount -= toAdd;
             }
         }
+
+        // Menge, die nicht eingefügt werden konnte
+        return amount;
     }
 
     public ItemStack getSlot(int index) {
-        return (index >= 0 && index < size) ? slots[index] : null;
+        return (index >= 0 && index < slots.length) ? slots[index] : null;
     }
 
     public void removeItem(int index) {
-        if (index >= 0 && index < size) {
+        if (index >= 0 && index < slots.length) {
             slots[index] = null;
         }
     }
 
-    public int getSize() {
-        return size;
+    public int getColumns() {
+        return columns;
+    }
+
+    public int getRows() {
+        return rows;
+    }
+
+    public int getTotalSlots() {
+        return slots.length;
     }
 }

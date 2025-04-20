@@ -58,10 +58,10 @@ public class GameScreen implements Screen {
         ItemRegistry.init(Assets.blockAtlas);
 
         world = new World();
-        inventory = new Inventory(10);
+        inventory = new Inventory(9, 4);
         player    = new Player(world, camera, inventory);
         world.addEntity(player);
-        inventoryUI = new InventoryUI(player.getInventory(), Assets.slotBackground, debugFont);
+        inventoryUI = new InventoryUI(player.getInventory(), Assets.slotBackground, Assets.inventoryBackground, debugFont);
     }
 
 
@@ -252,7 +252,7 @@ public class GameScreen implements Screen {
         // 2) UI zeichnen (Inventar, Debug‑Overlay usw.)
         batch.setProjectionMatrix(uiCamera.combined);
         batch.begin();
-        inventoryUI.render(batch, uiCamera, player.selectedSlot);
+        inventoryUI.render(batch, uiCamera, player.selectedSlot,player.inventoryOpen );
         debugRenderer.render(batch, player, getBlockAtCursor(), world);
         batch.end();
     }

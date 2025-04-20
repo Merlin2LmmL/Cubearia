@@ -30,8 +30,8 @@ public class Player extends Entity {
     public float finalmaxSpeed = 6f;
     public final int range = 5;
 
-
     public int selectedSlot = 0;
+    public boolean inventoryOpen;
 
     public boolean onGround = false;
     private boolean inWater = false;
@@ -58,7 +58,9 @@ public class Player extends Entity {
         this.world = world;
         this.camera = camera;
         this.inventory = inventory;
-        inventory.addItem(Item.valueOf("DIRT"), 641);
+        inventory.addItem(Item.valueOf("DIRT"), 576);
+        inventory.addItem(Item.valueOf("DIRT"), 576);
+        inventory.addItem(Item.valueOf("DIRT"), 576);
         // Prepare texture regions
         headRegion = new TextureRegion(Assets.playerTexture, 6, 0, 8, 8);
         bodyRegion = new TextureRegion(Assets.playerTexture, 0, 0, 6, 12);
@@ -85,12 +87,12 @@ public class Player extends Entity {
         }
 
         for (int i = 0; i <= 9; i++) {
-            if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_0)) {
-                selectedSlot = 9;
-            } else if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_0 + i)) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_0 + i)) {
                 selectedSlot = i - 1;
             }
         }
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {inventoryOpen = !inventoryOpen;}
 
         float accel = moveAcceleration * delta ;
         float airAccel = accel * airControlFactor;
