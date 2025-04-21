@@ -32,6 +32,7 @@ public class Player extends Entity {
 
     public int selectedSlot = 0;
     public boolean inventoryOpen;
+    public boolean inMenu;
 
     public boolean onGround = false;
     private boolean inWater = false;
@@ -60,7 +61,7 @@ public class Player extends Entity {
         this.inventory = inventory;
         inventory.addItem(Item.valueOf("DIRT"), 576);
         inventory.addItem(Item.valueOf("DIRT"), 576);
-        inventory.addItem(Item.valueOf("DIRT"), 576);
+        inventory.addItem(Item.valueOf("DIRT"), 64);
         // Prepare texture regions
         headRegion = new TextureRegion(Assets.playerTexture, 6, 0, 8, 8);
         bodyRegion = new TextureRegion(Assets.playerTexture, 0, 0, 6, 12);
@@ -74,8 +75,18 @@ public class Player extends Entity {
     public void update(float delta) {
         stateTime += delta;
 
-        boolean left  = Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
-        boolean right = Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT);
+        boolean left  = false;
+        boolean right = false;
+        if (!inMenu) {
+            left = Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
+            right = Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT);
+
+            for (int i = 0; i <= 9; i++) {
+                if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_0 + i)) {
+                    selectedSlot = i - 1;
+                }
+            }
+        }
 
         checkWaterState();
 
@@ -86,13 +97,10 @@ public class Player extends Entity {
             walkCycleTime = 0f;
         }
 
-        for (int i = 0; i <= 9; i++) {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_0 + i)) {
-                selectedSlot = i - 1;
-            }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
+            inventoryOpen = !inventoryOpen;
+            inMenu = !inMenu;
         }
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {inventoryOpen = !inventoryOpen;}
 
         float accel = moveAcceleration * delta ;
         float airAccel = accel * airControlFactor;

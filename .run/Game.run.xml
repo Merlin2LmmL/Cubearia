@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Game" type="Application" factoryName="Application">
+    <option name="ALTERNATIVE_JRE_PATH" value="corretto-17" />
+    <option name="MAIN_CLASS_NAME" value="com.example.cubearia.lwjgl3.Lwjgl3Launcher" />
+    <module name="Cubearia.lwjgl3.main" />
+    <option name="PROGRAM_PARAMETERS" value="--stacktrace " />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

@@ -17,7 +17,7 @@ public class Renderer {
     public static void renderWorld(World world, Player player, SpriteBatch batch) {
         Set<Point> visibleAir = new HashSet<>();  // Standard leere Menge, falls RENDERALLBLOCKS wahr ist
         if (!Settings.RENDERALLBLOCKS) {
-            visibleAir = computeVisibleAir(world, player.x);
+            visibleAir = computeVisibleAir(world, player.x + player.width / 2, player.y);
         }
 
         // 2. Alle geladenen Chunks rendern
@@ -62,45 +62,51 @@ public class Renderer {
         }
     }
 
+    private static final int RADIUS_IN_CHUNKS = Settings.RENDERDISTANCE;
 
-    private static Set<Point> computeVisibleAir(World world, float playerX) {
+    private static Set<Point> computeVisibleAir(World world, float playerX, float playerY) {
         Set<Point> visited = new HashSet<>();
         Deque<Point> queue = new ArrayDeque<>();
-        int maxIterations = 100000; // failsafe für infinite loops
+        int maxIterations = 100_000;
         int iterationCount = 0;
 
-        for (Map.Entry<Integer, Chunk> entry : world.chunks.entrySet()) {
-            int chunkX = entry.getKey();
-            if (chunkX >= (playerX / 16 - 1) - Settings.RENDERDISTANCE && chunkX <= (playerX / 16) + Settings.RENDERDISTANCE) {
-                Chunk chunk = entry.getValue();
+        int startX = (int) playerX;
+        int startY = (int) playerY;
 
-                for (int lx = 0; lx < Chunk.WIDTH; lx++) {
-                    int gx = chunkX * Chunk.WIDTH + lx;
-                    int gy = Chunk.HEIGHT - 1;
+        // Berechne die Weltgrenzen, innerhalb derer gesucht werden darf
+        int minX = ((startX / Chunk.WIDTH) - RADIUS_IN_CHUNKS) * Chunk.WIDTH;
+        int maxX = ((startX / Chunk.WIDTH) + RADIUS_IN_CHUNKS + 1) * Chunk.WIDTH - 1;
+        int minY = 0;
+        int maxY = Chunk.HEIGHT - 1;
 
-                    if (chunk.blocks[lx][gy] == BlockType.AIR) {
-                        Point p = new Point(gx, gy);
-                        visited.add(p);
-                        queue.add(p);
-                    }
+        // Starte nur, wenn Spieler in Luft steht
+        if (world.getBlock(startX, startY) != BlockType.AIR) return visited;
+
+        Point start = new Point(startX, startY);
+        visited.add(start);
+        queue.add(start);
+
+        int[] dx = Renderer.DX;
+        int[] dy = Renderer.DY;
+
+        while (!queue.isEmpty() && iterationCount++ < maxIterations) {
+            Point current = queue.poll();
+
+            for (int i = 0; i < 4; i++) {
+                int nx = current.x + dx[i];
+                int ny = current.y + dy[i];
+
+                // Nur im erlaubten Bereich bleiben
+                if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
+
+                Point neighbor = new Point(nx, ny);
+                if (!visited.contains(neighbor) && world.getBlock(nx, ny) == BlockType.AIR) {
+                    visited.add(neighbor);
+                    queue.add(neighbor);
                 }
             }
         }
 
-        while (!queue.isEmpty() && iterationCount++ < maxIterations) {
-            Point p = queue.removeFirst();
-
-            for (int i = 0; i < 4; i++) {
-                int nx = p.x + DX[i];
-                int ny = p.y + DY[i];
-                Point np = new Point(nx, ny);
-                if (visited.contains(np)) continue;
-                if (getBlockAt(world, nx, ny) != BlockType.AIR) continue;
-
-                visited.add(np);
-                queue.addLast(np);
-            }
-        }
         return visited;
     }
 

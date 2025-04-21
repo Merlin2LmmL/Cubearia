@@ -1,6 +1,8 @@
 TODO:
 - Inventory Drag & Drop
-- Non Block Items
+- New Items includes:
+    + New Biom specific Items
+    + Non Block Items (like Tools + Implement better Breaking System)
 - Structures
 - Mobs
 - New Dimensions (Nether & End)

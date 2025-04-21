@@ -12,23 +12,21 @@ import com.example.cubearia.game.world.BlockType;
 import com.example.cubearia.game.world.Chunk;
 import com.example.cubearia.game.world.Renderer;
 import com.example.cubearia.game.world.World;
-import com.example.cubearia.ui.DebugRenderer;
-import com.example.cubearia.ui.InventoryUI;
+import com.example.cubearia.ui.*;
 
 public class GameScreen implements Screen {
     public static final int TILE_SIZE = 16;
 
     private SpriteBatch batch;
     public OrthographicCamera camera;
-    private OrthographicCamera uiCamera;
-    private BitmapFont debugFont;
+    public OrthographicCamera uiCamera;
+    public BitmapFont debugFont;
     private DebugRenderer debugRenderer;
 
     private World world;
     private Player player;
     private Inventory inventory;
-    private InventoryUI inventoryUI;
-    private Boolean debug = false;
+    private UIManager uiManager;
 
     // in GameScreen:
     private final float DEADZONE_WIDTH  = 3 * TILE_SIZE;   // z.B. 3 Tiles links/rechts
@@ -61,7 +59,7 @@ public class GameScreen implements Screen {
         inventory = new Inventory(9, 4);
         player    = new Player(world, camera, inventory);
         world.addEntity(player);
-        inventoryUI = new InventoryUI(player.getInventory(), Assets.slotBackground, Assets.inventoryBackground, debugFont);
+        uiManager = new UIManager(player, uiCamera);
     }
 
 
@@ -104,25 +102,46 @@ public class GameScreen implements Screen {
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override
             public boolean scrolled(float amountX, float amountY) {
-                camera.zoom += amountY * 0.1f;
-                camera.zoom = MathUtils.clamp(camera.zoom, 0.2f, 3f);
+                camera.zoom = MathUtils.clamp(camera.zoom + amountY * 0.1f, 0.2f, 3f);
+                return true;
+            }
+
+            @Override
+            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+                uiManager.pressClick(screenX, screenY, button);
+                return true;
+            }
+
+            @Override
+            public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+                uiManager.releaseClick(screenX, screenY, button);
+                return true;
+            }
+
+            @Override
+            public boolean touchDragged(int screenX, int screenY, int pointer) {
+                uiManager.updateMousePosition(screenX, screenY);
                 return true;
             }
         });
 
+        // Mouse-Position fürs UI updaten
+        Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+        uiCamera.unproject(mouse);
 
         camera.update();
 
         // Input-Handling für Blockabbau/platzierung
-        handleBlockBreaking();
-        handleBlockPlacing();
+        if (!player.inMenu) {
+            handleBlockBreaking();
+            handleBlockPlacing();
+        }
 
         // Debug Modus toggeln
         if (Gdx.input.isKeyJustPressed(Input.Keys.F4)) {
             debugRenderer.toggle();
         }
     }
-
     public int getBlockGlobalXAtCursor() {
         Vector3 mousePos = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
         camera.unproject(mousePos);
@@ -252,7 +271,7 @@ public class GameScreen implements Screen {
         // 2) UI zeichnen (Inventar, Debug‑Overlay usw.)
         batch.setProjectionMatrix(uiCamera.combined);
         batch.begin();
-        inventoryUI.render(batch, uiCamera, player.selectedSlot,player.inventoryOpen );
+        uiManager.render(batch);
         debugRenderer.render(batch, player, getBlockAtCursor(), world);
         batch.end();
     }
@@ -265,9 +284,8 @@ public class GameScreen implements Screen {
         camera.setToOrtho(false, tilesVisibleX * TILE_SIZE, tilesVisibleY * TILE_SIZE);
 
         // UI‑Kamera
-        uiCamera.setToOrtho(false, tilesVisibleX * TILE_SIZE, tilesVisibleY * TILE_SIZE);
+        uiCamera.setToOrtho(false, width, height);
     }
-
 
     @Override public void pause() {}
     @Override public void resume() {}

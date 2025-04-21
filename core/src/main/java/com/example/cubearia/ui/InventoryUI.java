@@ -2,143 +2,141 @@ package com.example.cubearia.ui;
 
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.math.Vector3;
+import com.example.cubearia.game.Assets;
+import com.example.cubearia.game.Settings;
 import com.example.cubearia.game.inventory.Inventory;
 import com.example.cubearia.game.inventory.ItemStack;
-import com.example.cubearia.game.Settings;
 
-public class InventoryUI {
+import java.util.ArrayList;
+import java.util.List;
+
+class InventoryUI {
     private final Inventory inventory;
-    private final Texture slotBackground;
-    private final Texture inventoryBackground;
-    private final BitmapFont font;
-    private final float uiSize = Settings.UISCALE;
+    private final Texture background;
 
-    public InventoryUI(Inventory inventory, Texture slotBackground, Texture inventoryBackground, BitmapFont font) {
+    private ItemStack draggedStack = null;
+    private int draggedIndex = -1;
+
+    private float mouseX, mouseY;
+    private final Vector3 mouseVec = new Vector3();
+
+    private List<SlotRegion> regions = new ArrayList<>();
+
+    public InventoryUI(Inventory inventory) {
         this.inventory = inventory;
-        this.slotBackground = slotBackground;
-        this.inventoryBackground = inventoryBackground;
-        this.font = font;
+        this.background = Assets.inventoryBackground;
     }
 
-    /**
-     * Rendert das Inventar.
-     * @param batch           SpriteBatch
-     * @param uiCam           UI-Kamera
-     * @param selectedSlotIdx Index des markierten Slots (0 bis totalSlots-1)
-     * @param inventoryOpened true: ganzes Inventar auf Hintergrund, false: nur erste Reihe
-     */
-    public void render(SpriteBatch batch, OrthographicCamera uiCam, int selectedSlotIdx, boolean inventoryOpened) {
-        float vw = uiCam.viewportWidth;
-        float vh = uiCam.viewportHeight;
+    public void updateMousePosition(float screenX, float screenY, OrthographicCamera uiCam) {
+        mouseVec.set(screenX, screenY, 0);
+        uiCam.unproject(mouseVec);
+        mouseX = mouseVec.x;
+        mouseY = mouseVec.y;
+    }
 
-        // Basis-Slot-Größe in UI‑Units
-        float slotSizePx = vw * 0.06f * uiSize;
+    public void handleTouchDown(float screenX, float screenY, OrthographicCamera uiCam) {
+        float vw = uiCam.viewportWidth, vh = uiCam.viewportHeight;
+        float[] bgBox = computeBackgroundBox(vw, vh);
+        updateRegions(bgBox);
 
-        if (!inventoryOpened) {
-            slotSizePx = vw * 0.06f * uiSize * 1.5f;
-            // Nur die erste Reihe (Hotbar)
-            float paddingPx  = slotSizePx * 0.1f;
-            int cols = inventory.getColumns();
+        updateMousePosition(screenX, screenY, uiCam);
 
-            float totalWidth = cols * slotSizePx + (cols - 1) * paddingPx;
-            float startX     = (vw - totalWidth) / 2f;
-            float startY     = vh * 0.05f;
+        SlotRegion region = findRegionAt(mouseX, mouseY);
+        if (region == null) return;
 
-            for (int col = 0; col < cols; col++) {
-                int idx = col;
-                float x = startX + col * (slotSizePx + paddingPx);
-                float y = startY;
-
-                // Highlight
-                if (idx == selectedSlotIdx) batch.setColor(0.6f, 0.6f, 0.6f, 1f);
-                batch.draw(slotBackground, x, y, slotSizePx, slotSizePx);
-                batch.setColor(1f, 1f, 1f, 1f);
-
-                ItemStack stack = inventory.getSlot(idx);
-                if (stack != null) {
-                    drawStack(batch, stack, x, y, slotSizePx);
-                }
-            }
-
-        } else {
-            // Inventar-Overlay mit Hintergrund
-
-            // 1) Skalierung: 1px im PNG entspricht scale UI‑Units
-            //    Wir nehmen hier die Breite eines Slot‑Cells im PNG, d.h. slotBackground.getWidth()
-            float cellPx = slotBackground.getWidth();
-            float scale  = slotSizePx / cellPx * uiSize;
-
-            // 2) Hintergrundgröße in UI‑Units
-            float bgWidth  = inventoryBackground.getWidth()  * scale;
-            float bgHeight = inventoryBackground.getHeight() * scale;
-
-            // 3) Zentriert
-            float bgX = (vw - bgWidth)  / 2f;
-            float bgY = (vh - bgHeight) / 2f;
-
-            // 4) Background zeichnen
-            batch.draw(inventoryBackground, bgX, bgY, bgWidth, bgHeight);
-
-            // 5) Innen-Abstand (Ränder im PNG, hier 5px) umrechnen
-            float sidePadding = 5f * scale;
-
-            // 6) Zwischenraum zwischen Slots entspricht ebenfalls slotBackground.getWidth()*scale
-            float cellUi = cellPx * scale;
-
-            // 7) Grid-Startkoordinate (oberste, linkeste Slot-Position)
-            int cols = inventory.getColumns();
-            int rows = inventory.getRows();
-            float gridStartX = bgX + sidePadding;
-            float gridStartY = bgY + bgHeight - sidePadding * 2 - cellUi * 4;
-
-            // 8) Hotbar rendern
-            int row = 0;
-            for (int col = 0; col < cols; col++) {
-                int idx = row * cols + col;
-                float x = gridStartX + col * cellUi;
-                float y = gridStartY - cellUi * 4 - sidePadding;
-
-                // Draw item stack
-                ItemStack stack = inventory.getSlot(idx);
-                if (stack != null) {
-                    drawStack(batch,
-                        stack,
-                        x,
-                        y,
-                        cellUi);
-                }
-            }
-
-            // 9) Alle restlichen rendern
-            for (row = 1; row < rows; row++) {
-                for (int col = 0; col < cols; col++) {
-                    int idx = row * cols + col;
-                    float x = gridStartX + col * cellUi;
-                    float y = gridStartY - row * cellUi;
-
-                    // Draw item stack
-                    ItemStack stack = inventory.getSlot(idx);
-                    if (stack != null) {
-                        drawStack(batch,
-                            stack,
-                            x,
-                            y,
-                            cellUi);
-                    }
-                }
-            }
+        int idx = region.getIndex();
+        ItemStack stack = inventory.getSlot(idx);
+        if (stack != null && !stack.isEmpty()) {
+            draggedStack = stack;
+            draggedIndex = idx;
+            inventory.setSlot(idx, null);
         }
     }
 
-    /** Hilfsmethode zum Zeichnen eines ItemStacks im Slot */
-    private void drawStack(SpriteBatch batch, ItemStack stack, float x, float y, float size) {
-        float iconSize = size * 0.7f;
-        float offset   = size * 0.1f;
-        batch.draw(stack.getItem().getIcon(), x + offset, y + offset, iconSize, iconSize);
-        font.setUseIntegerPositions(false);
-        font.getData().setScale(size * 0.025f);
-        font.draw(batch, String.valueOf(stack.getAmount()), x + size * 0.5f, y + size * 0.25f);
+    public void handleTouchUp(float screenX, float screenY, OrthographicCamera uiCam) {
+        if (draggedStack == null) return;
+
+        float vw = uiCam.viewportWidth, vh = uiCam.viewportHeight;
+        float[] bgBox = computeBackgroundBox(vw, vh);
+        updateRegions(bgBox);
+        updateMousePosition(screenX, screenY, uiCam);
+
+        SlotRegion region = findRegionAt(mouseX, mouseY);
+        if (region != null) {
+            int targetIdx = region.getIndex();
+            if (targetIdx == draggedIndex) {
+                inventory.setSlot(draggedIndex, draggedStack);
+            } else {
+                ItemStack targetStack = inventory.getSlot(targetIdx);
+                inventory.setSlot(targetIdx, draggedStack);
+                inventory.setSlot(draggedIndex, targetStack);
+            }
+        } else {
+            inventory.setSlot(draggedIndex, draggedStack);
+        }
+
+        draggedStack = null;
+        draggedIndex = -1;
+    }
+
+    public void render(SpriteBatch batch, OrthographicCamera uiCam) {
+        float vw = uiCam.viewportWidth, vh = uiCam.viewportHeight;
+        float[] bgBox = computeBackgroundBox(vw, vh);
+        float bgX = bgBox[0], bgY = bgBox[1], bgW = bgBox[2], bgH = bgBox[3];
+
+        // Hintergrund zeichnen
+        batch.draw(background, bgX, bgY, bgW, bgH);
+
+        // Slot-Bereiche aktualisieren
+        updateRegions(bgBox);
+
+        // Slots zeichnen
+        for (SlotRegion region : regions) {
+            Rectangle b = region.getBounds();
+            ItemStack stack = inventory.getSlot(region.getIndex());
+            if (stack != null && !stack.isEmpty()) {
+                stack.drawStack(batch, b.x, b.y, b.width);
+            }
+        }
+
+        // Gezogener Stack
+        if (draggedStack != null && !regions.isEmpty()) {
+            float slotSize = regions.get(0).getWidth();
+            float ds = slotSize * 0.9f;
+            draggedStack.drawStack(batch, mouseX - ds / 2f, mouseY - ds / 2f, ds);
+        }
+    }
+
+    private void updateRegions(float[] bgBox) {
+        float bgX = bgBox[0], bgY = bgBox[1], bgW = bgBox[2], bgH = bgBox[3];
+        List<SlotRegion> base = UILayout.INVENTORY.create(bgX, bgY, bgW, bgH);
+        regions.clear();
+        regions.addAll(base);
+    }
+
+    private SlotRegion findRegionAt(float x, float y) {
+        for (SlotRegion region : regions) {
+            if (region.getBounds().contains(x, y)) {
+                return region;
+            }
+        }
+        return null;
+    }
+
+    private float[] computeBackgroundBox(float vw, float vh) {
+        float scale = Settings.UISCALE;
+        float texW = background.getWidth(), texH = background.getHeight();
+        float ratio = texW / texH;
+        float maxW = vw * scale, maxH = vh * scale * 0.95f;
+        float bgW = maxW, bgH = bgW / ratio;
+        if (bgH > maxH) {
+            bgH = maxH;
+            bgW = bgH * ratio;
+        }
+        float bgX = (vw - bgW) / 2f, bgY = (vh - bgH) / 2f;
+        return new float[]{bgX, bgY, bgW, bgH};
     }
 }
