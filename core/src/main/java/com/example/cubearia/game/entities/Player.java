@@ -73,6 +73,10 @@ public class Player extends Entity {
 
     @Override
     public void update(float delta) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.B)) {
+            y = 70;
+            x = (float) Math.random() * 1000;
+        }
         stateTime += delta;
 
         boolean left  = false;
@@ -221,7 +225,7 @@ public class Player extends Entity {
     }
 
     public void render(SpriteBatch batch) {
-        float scale = GameScreen.TILE_SIZE / 16f;
+        float scale = GameScreen.TILE_SIZE / 16;
         float baseX = x * GameScreen.TILE_SIZE;
         float baseY = y * GameScreen.TILE_SIZE;
 

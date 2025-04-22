@@ -1,33 +1,24 @@
 package com.example.cubearia.game.world;
 
+import com.badlogic.gdx.math.MathUtils;
 import com.example.cubearia.game.Settings;
 
 public class Chunk {
     public static final int WIDTH = 16;
     public static final int HEIGHT = 128;
-
-    private static final int SEA_LEVEL   = 64;
-    private static final int OCEAN_DEPTH = 24;
+    private World world;
 
     private final int chunkX;
     public final BlockType[][] blocks = new BlockType[WIDTH][HEIGHT];
 
-    public Chunk(int chunkX, BiomeType prevBiome, BiomeType biome, BiomeType nextBiome) {
+    public Chunk(int chunkX, BiomeType prevBiome, BiomeType biome, BiomeType nextBiome, World world) {
+        this.world = world;
         this.chunkX = chunkX;
         generateTerrain(prevBiome, biome, nextBiome);
     }
 
     private void generateTerrain(BiomeType prev, BiomeType biome, BiomeType next) {
-        int[] raw;
-
-        if (Settings.FLATWORLD) {
-            raw = new int[WIDTH];
-            for (int i = 0; i < raw.length; i++) {
-                raw[i] = 64;
-            }
-        } else {
-            raw = getRawHeights(chunkX, biome);
-        }
+        int[] raw = getRawHeights(chunkX, biome);
 
         if (!Settings.FLATWORLD) {
             int[] heights = raw.clone();
@@ -37,41 +28,49 @@ public class Chunk {
 
         for (int x = 0; x < WIDTH; x++) {
             int terrainHeight = raw[x];
+            boolean surfaceGenerated = false;  // Um sicherzustellen, dass nur der oberste Block die Struktur erzeugt
+
             for (int y = 0; y < HEIGHT; y++) {
                 if (y < terrainHeight) {
                     int depth = terrainHeight - y - 1;
-                    if (Settings.FLATWORLD) {
-                        if (y == 63) {
-                            blocks[x][y] = BlockType.GRASSBLOCK;
-                        } else if (y > 58) {
-                            blocks[x][y] = BlockType.DIRT;
-                        } else {
-                            blocks[x][y] = BlockType.STONE;
-                        }
-                    } else {
-                        blocks[x][y] = biome.getBlockAtDepth(depth);
+                    blocks[x][y] = biome.getBlockAtDepth(depth);
+
+                    // Wenn der Block an der Oberfläche ist (der erste Block in dieser Spalte)
+                    if (!surfaceGenerated && y == terrainHeight - 1) {
+                        generateStructures(x, y);  // Aufruf der Struktur-Generierung
+
+                        surfaceGenerated = true;  // Markiere, dass die Struktur generiert wurde
                     }
-                } else if (y < SEA_LEVEL) {
+                } else if (y < Settings.SEA_LEVEL) {
                     blocks[x][y] = BlockType.WATER;
                 } else {
                     blocks[x][y] = BlockType.AIR;
                 }
-                blocks[x][0] = BlockType.BEDROCK;
             }
+            blocks[x][0] = BlockType.BEDROCK;
         }
     }
 
-    /**
-     * Glättet die ersten und letzten blendWidth Spalten so, dass
-     * raw[0] auf den Nachbar-Wert prevBorder trifft und raw[WIDTH-1]
-     * auf nextBorder, mit einer sanften linearen Interpolation.
-     */
+    private int[] getRawHeights(int chunkX, BiomeType biome) {
+        int[] raw = new int[WIDTH];
+        for (int x = 0; x < WIDTH; x++) {
+            int globalX = chunkX * WIDTH + x;
+            // Terrain-Höhe inklusive Fluktuation
+            int baseHeight = (int) Noise.getHeight(globalX, biome.getFluctuation());
+            int waterDepth = biome.getWaterDepth();
+            if (waterDepth > 0) {
+                // Meeresboden = Terrain-Höhe minus Wasser-Tiefe
+                raw[x] = baseHeight - waterDepth;
+            } else {
+                raw[x] = baseHeight;
+            }
+        }
+        return raw;
+    }
     private void smoothEdges(int[] raw, int[] heights, BiomeType prev, BiomeType biome, BiomeType next) {
-        if (biome == BiomeType.OCEAN) return;
+        if (biome.name().contains("OZEAN")) return;
+        final int blendWidth = 8;
 
-        final int blendWidth = 4;
-
-        // —— Linke Kante ——
         if (prev != null) {
             int[] leftRaw = getRawHeights(chunkX - 1, prev);
             int prevBorder = leftRaw[WIDTH - 1];
@@ -79,13 +78,11 @@ public class Chunk {
             float interfaceHeight = (prevBorder + thisBorder) / 2.0f;
 
             for (int i = 0; i < blendWidth; i++) {
-                // t: Gewichtung für den Schnittpunkt (je näher an der Grenze, desto größer)
                 float t = 1.0f - (i + 1) / (float)(blendWidth + 1);
                 heights[i] = (int)(raw[i] * (1 - t) + interfaceHeight * t);
             }
         }
 
-        // —— Rechte Kante ——
         if (next != null) {
             int[] rightRaw = getRawHeights(chunkX + 1, next);
             int nextBorder = rightRaw[0];
@@ -99,19 +96,10 @@ public class Chunk {
         }
     }
 
-    private int[] getRawHeights(int chunkX, BiomeType biome) {
-        int[] raw = new int[WIDTH];
-        for (int x = 0; x < WIDTH; x++) {
-            int globalX = chunkX * WIDTH + x;
-            int h = (int) Noise.getHeight(globalX, biome.getFluctuation());
-            if (biome == BiomeType.OCEAN) {
-                int max = SEA_LEVEL - 1;
-                int min = SEA_LEVEL - OCEAN_DEPTH;
-                h = Math.max(min, Math.min(max, h));
-            }
-            raw[x] = h;
+    public void generateStructures(int x, int y) {
+        if (MathUtils.random(1, 1000) == 1) {
+            world.loadStructure("Tree.tmx", x * chunkX, y + 4);
         }
-        return raw;
     }
 
     @Override

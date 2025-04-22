@@ -1,6 +1,9 @@
 package com.example.cubearia.game.world;
 
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.maps.tiled.TiledMap;
+import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
+import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.example.cubearia.game.Settings;
 import com.example.cubearia.game.entities.Entity;
 
@@ -44,7 +47,7 @@ public class World {
         if (chunk == null) {
             int globalX = chunkX * Chunk.WIDTH;
             BiomeType biome = getBiomeTypeAt(globalX);
-            chunk = new Chunk(chunkX, getBiomeTypeAt((int) (globalX - 16)), biome, getBiomeTypeAt((int) (globalX + 16)));
+            chunk = new Chunk(chunkX, getBiomeTypeAt((int) (globalX - 16)), biome, getBiomeTypeAt((int) (globalX + 16)), this);
             chunks.put(chunkX, chunk);
         }
         return chunk;
@@ -70,10 +73,33 @@ public class World {
         chunk.blocks[localX][y] = type;
     }
 
+    // Methode zum Laden und Einfügen einer Struktur (Map) in die Welt
+    public void loadStructure(String mapFile, int startX, int startY) {
+        TmxMapLoader mapLoader = new TmxMapLoader();
+        TiledMap map = mapLoader.load(mapFile);
+
+        // Hole die Haupt-Schicht der Map (Die Layer, in denen die Blöcke gespeichert sind)
+        TiledMapTileLayer layer = (TiledMapTileLayer) map.getLayers().get(0); // 0 = erstes Layer
+
+        for (int x = 0; x < layer.getWidth(); x++) {
+            for (int y = 0; y < layer.getHeight(); y++) {
+                // Hole die Tile-ID an der Position (x, y)
+                int tileId = layer.getCell(x, y) != null ? layer.getCell(x, y).getTile().getId() : -1;
+
+                if (tileId != -1) {
+                    // Hier kannst du den Blocktyp anhand der Tile-ID bestimmen
+                    BlockType block = BlockType.getById(tileId - 1);
+
+                    // Setze den Block in die Welt
+                    setBlock(startX + x, startY + y, block);
+                }
+            }
+        }
+    }
+
     public BiomeType getBiomeTypeAt(int globalX) {
         return biomeGenerator.getBiomeAt(globalX); // korrekt aus dem Generator holen
     }
-
 
     public void addEntity(Entity e) {
         entities.add(e);

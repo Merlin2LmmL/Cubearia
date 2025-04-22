@@ -53,7 +53,7 @@ public class GameScreen implements Screen {
         Assets.load();
 
         // Block Atlas initialisieren
-        ItemRegistry.init(Assets.blockAtlas);
+        ItemRegistry.init();
 
         world = new World();
         inventory = new Inventory(9, 4);
@@ -176,7 +176,7 @@ public class GameScreen implements Screen {
                 if (!isBreaking || globalX != breakingX || globalY != breakingY) {
                     breakingX = globalX;
                     breakingY = globalY;
-                    breakingTimeTotal = (float) (block.hardness * 0.4f);
+                    breakingTimeTotal = (float) (block.getHardness() * 0.4f);
                     breakingTimer = 0f;
                     isBreaking = true;
                 } else {
@@ -215,7 +215,7 @@ public class GameScreen implements Screen {
         if (!player.isInRange(globalX, globalY)) return;
 
         // 3) Nur auf Luft setzen
-        if (world.getBlock(globalX, globalY) != BlockType.AIR) return;
+        if (world.getBlock(globalX, globalY) != BlockType.AIR && world.getBlock(globalX, globalY) != BlockType.WATER) return;
 
         if (player.intersects(globalX, globalY)) return;
 

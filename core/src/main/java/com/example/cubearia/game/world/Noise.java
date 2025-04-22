@@ -22,7 +22,7 @@ public class Noise {
         float v1 = getValue(i);
         float v2 = getValue(i + 1);
 
-        return smoothLerp(v1, v2, frac) / 2.5f;
+        return smoothLerp(v1, v2, frac);
     }
 
     private static float getValue(int i) {

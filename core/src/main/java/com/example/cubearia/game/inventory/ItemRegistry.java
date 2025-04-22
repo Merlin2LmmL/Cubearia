@@ -1,6 +1,5 @@
 package com.example.cubearia.game.inventory;
 
-import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.example.cubearia.game.world.BlockType;
 
@@ -10,23 +9,18 @@ import java.util.Map;
 public class ItemRegistry {
     private static final Map<String, Item> itemsById = new HashMap<>();
 
-    public static void init(TextureAtlas blockAtlas) {
+    public static void init() {
         for (BlockType block : BlockType.values()) {
-            if (block == BlockType.AIR || block == BlockType.WATER)
-                continue; // nicht als Items
+            // Blöcke überspringen, die nicht im Inventar erscheinen sollen
+            if (block == BlockType.AIR || block == BlockType.WATER || block.getRegion() == null) {
+                continue;
+            }
 
             String id = block.name().toLowerCase(); // z.B. "stone"
-            TextureRegion icon = blockAtlas.findRegion("tiles"); // dein TileSheet
-            if (icon != null) {
-                TextureRegion blockIcon = new TextureRegion(
-                    icon,
-                    block.getTileX() * 16, block.getTileY() * 16,
-                    16, 16
-                );
+            TextureRegion icon = block.getRegion();
 
-                Item item = new Item(id, block.name(), blockIcon, 64);
-                register(item);
-            }
+            Item item = new Item(id, block.name(), icon, 64); // maxStackSize = 64
+            register(item);
         }
     }
 

@@ -1,7 +1,10 @@
 package com.example.cubearia.ui;
 
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.example.cubearia.game.Settings;
+import com.example.cubearia.game.entities.Player;
 
+import javax.swing.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

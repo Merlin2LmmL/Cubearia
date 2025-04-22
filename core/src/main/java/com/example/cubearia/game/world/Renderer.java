@@ -1,6 +1,7 @@
 package com.example.cubearia.game.world;
 
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.example.cubearia.game.Assets;
 import com.example.cubearia.game.Settings;
 import com.example.cubearia.game.entities.Player;
@@ -17,7 +18,7 @@ public class Renderer {
     public static void renderWorld(World world, Player player, SpriteBatch batch) {
         Set<Point> visibleAir = new HashSet<>();  // Standard leere Menge, falls RENDERALLBLOCKS wahr ist
         if (!Settings.RENDERALLBLOCKS) {
-            visibleAir = computeVisibleAir(world, player.x + player.width / 2, player.y);
+            visibleAir = computeVisibleAir(world, player.x, player.y);
         }
 
         // 2. Alle geladenen Chunks rendern
@@ -46,13 +47,11 @@ public class Renderer {
                         }
 
                         if (!isAir && isVisible) {
-                            int tx = type.getTileX();
-                            int ty = type.getTileY();
-                            batch.draw(Assets.blockTexture,
-                                dstX, dstY, TILE_SIZE, TILE_SIZE,
-                                tx * TILE_SIZE, ty * TILE_SIZE,
-                                TILE_SIZE, TILE_SIZE,
-                                false, false);
+                            TextureRegion region = type.getRegion();  // Hole die Region aus dem BlockType
+                            if (region != null) {
+                                batch.draw(region,
+                                    dstX, dstY, TILE_SIZE, TILE_SIZE);  // Zeichne die Region an der gewünschten Position
+                            }
                         } else if (!Settings.RENDERALLBLOCKS) {
                                 batch.draw(Assets.blackPixel, dstX, dstY, TILE_SIZE, TILE_SIZE);
                         }
@@ -80,7 +79,7 @@ public class Renderer {
         int maxY = Chunk.HEIGHT - 1;
 
         // Starte nur, wenn Spieler in Luft steht
-        if (world.getBlock(startX, startY) != BlockType.AIR) return visited;
+        if (world.getBlock(startX, startY).isSolid()) return visited;
 
         Point start = new Point(startX, startY);
         visited.add(start);
@@ -100,7 +99,8 @@ public class Renderer {
                 if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
 
                 Point neighbor = new Point(nx, ny);
-                if (!visited.contains(neighbor) && world.getBlock(nx, ny) == BlockType.AIR) {
+                BlockType block = world.getBlock(nx, ny);
+                if (!visited.contains(neighbor) && !block.isSolid()) {
                     visited.add(neighbor);
                     queue.add(neighbor);
                 }
