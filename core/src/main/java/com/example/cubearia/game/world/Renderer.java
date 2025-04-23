@@ -16,19 +16,25 @@ public class Renderer {
     private static final int[] DX = {1, -1, 0, 0};
     private static final int[] DY = {0, 0, 1, -1};
 
+    // Erweitertes Sichtfeld um einen Chunk nach hinten
+    private static final int BACK_EXTRA = 1;
+    private static final int RADIUS_IN_CHUNKS = Settings.RENDERDISTANCE + BACK_EXTRA;
+
     public static void renderWorld(World world, Player player, SpriteBatch batch) {
-        Set<Point> visibleAir = new HashSet<>();  // Standard leere Menge, falls RENDERALLBLOCKS wahr ist
+        Set<Point> visibleAir = new HashSet<>();
         if (!Settings.RENDERALLBLOCKS) {
             visibleAir = computeVisibleAir(world, player.x, player.y);
         }
 
-        // 2. Alle geladenen Chunks rendern
+        int playerChunk = Math.floorDiv(Math.round(player.x), Chunk.WIDTH);
+        int minChunk = playerChunk - Settings.RENDERDISTANCE - BACK_EXTRA;
+        int maxChunk = playerChunk + Settings.RENDERDISTANCE + BACK_EXTRA;
+
         for (Map.Entry<Integer, Chunk> entry : world.getChunks().entrySet()) {
             int chunkX = entry.getKey();
             Chunk chunk = entry.getValue();
 
-            if (chunkX >= (player.x / Chunk.WIDTH) - Settings.RENDERDISTANCE &&
-                chunkX <= (player.x / Chunk.WIDTH) + Settings.RENDERDISTANCE) {
+            if (chunkX >= minChunk && chunkX <= maxChunk) {
                 for (int lx = 0; lx < Chunk.WIDTH; lx++) {
                     for (int y = 0; y < Chunk.HEIGHT; y++) {
                         int gx = chunkX * Chunk.WIDTH + lx;
@@ -37,23 +43,21 @@ public class Renderer {
                         BlockType type = chunk.blocks[lx][y];
                         boolean isAir = type == BlockType.AIR;
 
-                        // Alle Blöcke sind sichtbar, wenn RENDERALLBLOCKS wahr ist
-                        boolean isVisible = Settings.RENDERALLBLOCKS || visibleAir.contains(p) ||
-                            (!isAir && hasAdjacentVisibleAir(p, visibleAir));
+                        boolean isVisible = Settings.RENDERALLBLOCKS || visibleAir.contains(p)
+                            || (!isAir && hasAdjacentVisibleAir(p, visibleAir));
 
                         float dstX = gx * TILE_SIZE;
                         float dstY = gy * TILE_SIZE;
 
-                        // Sichtbare Luft überspringen, wenn RENDERALLBLOCKS wahr ist
+                        // Luftblöcke überspringen, die sichtbar sind
                         if (isAir && visibleAir.contains(p)) {
-                            continue; // sichtbare Luft = Hintergrund
+                            continue;
                         }
 
                         if (!isAir && isVisible) {
-                            TextureRegion region = type.getRegion();  // Hole die Region aus dem BlockType
+                            TextureRegion region = type.getRegion();
                             if (region != null) {
-                                batch.draw(region,
-                                    dstX, dstY, TILE_SIZE, TILE_SIZE);  // Zeichne die Region an der gewünschten Position
+                                batch.draw(region, dstX, dstY, TILE_SIZE, TILE_SIZE);
                             }
                         } else if (!Settings.RENDERALLBLOCKS) {
                             batch.draw(Assets.blackPixel, dstX, dstY, TILE_SIZE, TILE_SIZE);
@@ -63,26 +67,19 @@ public class Renderer {
             }
         }
 
-        // Debug: dünne grüne Linien zwischen den Chunk-Grenzen
         if (Settings.DEBUG) {
-            // Berechne Spieler-Chunk-Index
-            int playerChunkX = Math.floorDiv((int) player.x, Chunk.WIDTH);
-            int minBoundary = playerChunkX - Settings.RENDERDISTANCE;
-            int maxBoundary = playerChunkX + Settings.RENDERDISTANCE + 1;
+            int minBoundary = playerChunk - Settings.RENDERDISTANCE + 1 - BACK_EXTRA;
+            int maxBoundary = playerChunk + Settings.RENDERDISTANCE + 1 + BACK_EXTRA;
             float worldHeightPixels = Chunk.HEIGHT * TILE_SIZE;
 
-            // Farbzustand sichern und setzen
             batch.setColor(Color.GREEN);
             for (int boundary = minBoundary; boundary <= maxBoundary; boundary++) {
                 float lineX = boundary * Chunk.WIDTH * TILE_SIZE;
-                // Ziehe eine 1px breite Linie entlang der y-Achse mit weißem Pixel, damit die Färbung sichtbar ist
                 batch.draw(Assets.whitePixel, lineX, 0, 1, worldHeightPixels);
             }
             batch.setColor(Color.WHITE);
         }
     }
-
-    private static final int RADIUS_IN_CHUNKS = Settings.RENDERDISTANCE;
 
     private static Set<Point> computeVisibleAir(World world, float playerX, float playerY) {
         Set<Point> visited = new HashSet<>();
@@ -93,35 +90,46 @@ public class Renderer {
         int startX = (int) playerX;
         int startY = (int) playerY;
 
-        // Berechne die Weltgrenzen, innerhalb derer gesucht werden darf
         int minX = ((startX / Chunk.WIDTH) - RADIUS_IN_CHUNKS) * Chunk.WIDTH;
         int maxX = ((startX / Chunk.WIDTH) + RADIUS_IN_CHUNKS + 1) * Chunk.WIDTH - 1;
         int minY = 0;
         int maxY = Chunk.HEIGHT - 1;
 
-        // Starte nur, wenn Spieler in Luft steht
-        if (world.getBlock(startX, startY).isSolid()) return visited;
-
         Point start = new Point(startX, startY);
+        BlockType startBlock = getBlockSafe(world, startX, startY);
+
+        if (startBlock == null || startBlock.isSolid()) {
+            boolean found = false;
+            for (int i = 0; i < 4; i++) {
+                int nx = startX + DX[i];
+                int ny = startY + DY[i];
+                BlockType neighbor = getBlockSafe(world, nx, ny);
+                if (neighbor != null && !neighbor.isSolid()) {
+                    startX = nx;
+                    startY = ny;
+                    start = new Point(startX, startY);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) return visited;
+        }
+
         visited.add(start);
         queue.add(start);
-
-        int[] dx = Renderer.DX;
-        int[] dy = Renderer.DY;
 
         while (!queue.isEmpty() && iterationCount++ < maxIterations) {
             Point current = queue.poll();
 
             for (int i = 0; i < 4; i++) {
-                int nx = current.x + dx[i];
-                int ny = current.y + dy[i];
+                int nx = current.x + DX[i];
+                int ny = current.y + DY[i];
 
-                // Nur im erlaubten Bereich bleiben
                 if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
 
                 Point neighbor = new Point(nx, ny);
-                BlockType block = world.getBlock(nx, ny);
-                if (!visited.contains(neighbor) && !block.isSolid()) {
+                BlockType block = getBlockSafe(world, nx, ny);
+                if (block != null && !block.isSolid() && !visited.contains(neighbor)) {
                     visited.add(neighbor);
                     queue.add(neighbor);
                 }
@@ -139,10 +147,10 @@ public class Renderer {
         return false;
     }
 
-    private static BlockType getBlockAt(World world, int gx, int gy) {
+    private static BlockType getBlockSafe(World world, int gx, int gy) {
         int chunkX = Math.floorDiv(gx, Chunk.WIDTH);
         Chunk chunk = world.getChunks().get(chunkX);
-        if (chunk == null || gy < 0 || gy >= Chunk.HEIGHT) return BlockType.DIRT; // treat as solid to block flood
+        if (chunk == null || gy < 0 || gy >= Chunk.HEIGHT) return null;
         int lx = Math.floorMod(gx, Chunk.WIDTH);
         return chunk.blocks[lx][gy];
     }

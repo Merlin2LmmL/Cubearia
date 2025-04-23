@@ -4,11 +4,8 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.g2d.Animation;
-import com.badlogic.gdx.maps.tiled.TiledMap;
-import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.example.cubearia.game.world.BlockType;
 
@@ -25,10 +22,6 @@ public class Assets {
     public static Animation<TextureRegion> breakingAnimation;
 
     // Maps
-    public static TiledMap cactiMap;
-    public static TiledMap iceSpikeMap;
-    public static TiledMap lavaSeaMap;
-    public static TiledMap treeMap;
     public static OrthogonalTiledMapRenderer cactiMapRenderer;
     public static OrthogonalTiledMapRenderer iceSpikeMapRenderer;
     public static OrthogonalTiledMapRenderer lavaSeaMapRenderer;
@@ -36,7 +29,7 @@ public class Assets {
 
     public static void load() {
         // 1) Lade das Tileset
-        tileset = new TilesetLoader("Blocks.tsx");
+        tileset = new TilesetLoader("maps/Blocks.tsx");
         for (BlockType block : BlockType.values()) {
             block.resolve(tileset);
         }
@@ -66,23 +59,6 @@ public class Assets {
             breakingFrames[i] = new TextureRegion(breakingSheet, i * 16, 0, 16, 16);
         }
         breakingAnimation = new Animation<>(0.1f, breakingFrames);
-
-        // 5) Lade TMX-Maps
-        loadMaps();
-    }
-
-    private static void loadMaps() {
-        // Lade die Maps mit TmxMapLoader
-        cactiMap = new TmxMapLoader().load("Cacti.tmx");
-        iceSpikeMap = new TmxMapLoader().load("Ice Spike.tmx");
-        lavaSeaMap = new TmxMapLoader().load("Lava Sea.tmx");
-        treeMap = new TmxMapLoader().load("Tree.tmx");
-
-        // Erstelle Renderer für jede Map
-        cactiMapRenderer = new OrthogonalTiledMapRenderer(cactiMap);
-        iceSpikeMapRenderer = new OrthogonalTiledMapRenderer(iceSpikeMap);
-        lavaSeaMapRenderer = new OrthogonalTiledMapRenderer(lavaSeaMap);
-        treeMapRenderer = new OrthogonalTiledMapRenderer(treeMap);
     }
 
     public static void dispose() {
@@ -91,12 +67,6 @@ public class Assets {
         playerTexture.dispose();
         slotBackground.dispose();
         inventoryBackground.dispose();
-
-        // Entsorge TMX-Maps und Renderer
-        cactiMap.dispose();
-        iceSpikeMap.dispose();
-        lavaSeaMap.dispose();
-        treeMap.dispose();
 
         cactiMapRenderer.dispose();
         iceSpikeMapRenderer.dispose();

@@ -1,8 +1,11 @@
 package com.example.cubearia.game.world;
 
-import com.badlogic.gdx.math.MathUtils;
 import com.example.cubearia.game.Settings;
+import java.util.Random;
 
+/**
+ * Ein Chunk repräsentiert einen Abschnitt der Welt mit Terrain und optionalen Strukturen.
+ */
 public class Chunk {
     public static final int WIDTH  = 16;
     public static final int HEIGHT = 128;
@@ -17,6 +20,16 @@ public class Chunk {
         generateTerrain(prevBiome, biome, nextBiome);
     }
 
+    /**
+     * Gibt die aktuelle Chunk-Koordinate.
+     */
+    public int getChunkX() {
+        return chunkX;
+    }
+
+    /**
+     * Erzeugt das Terrain und queued Strukturen an der Oberfläche.
+     */
     private void generateTerrain(BiomeType prev, BiomeType biome, BiomeType next) {
         int[] raw = Settings.FLATWORLD
             ? getFlatHeights()
@@ -50,7 +63,7 @@ public class Chunk {
                     blocks[x][y] = BlockType.AIR;
                 }
             }
-            // Bedrock:
+            // Bedrock immer am Boden
             blocks[x][0] = BlockType.BEDROCK;
         }
     }
@@ -58,7 +71,9 @@ public class Chunk {
     private int[] getFlatHeights() {
         int[] h = new int[WIDTH];
         int level = Settings.SEA_LEVEL + 2;
-        for (int i = 0; i < WIDTH; i++) h[i] = level;
+        for (int i = 0; i < WIDTH; i++) {
+            h[i] = level;
+        }
         return h;
     }
 
@@ -66,7 +81,7 @@ public class Chunk {
         int[] raw = new int[WIDTH];
         for (int x = 0; x < WIDTH; x++) {
             int globalX = chunkX * WIDTH + x;
-            int base  = (int)Noise.getHeight(globalX, biome.getFluctuation());
+            int base  = (int) Noise.getHeight(globalX, biome.getFluctuation());
             int water = biome.getWaterDepth();
             raw[x] = water > 0 ? base - water : base;
         }
@@ -81,37 +96,52 @@ public class Chunk {
             int[] leftRaw  = getRawHeights(chunkX - 1, prev);
             float ih = (leftRaw[WIDTH - 1] + raw[0]) / 2f;
             for (int i = 0; i < blend; i++) {
-                float t = 1 - (i+1)/(float)(blend+1);
-                heights[i] = (int)(raw[i]*(1-t) + ih*t);
+                float t = 1 - (i + 1) / (float) (blend + 1);
+                heights[i] = (int) (raw[i] * (1 - t) + ih * t);
             }
         }
         if (next != null) {
             int[] rightRaw = getRawHeights(chunkX + 1, next);
-            float ih = (rightRaw[0] + raw[WIDTH-1]) / 2f;
+            float ih = (rightRaw[0] + raw[WIDTH - 1]) / 2f;
             for (int i = 0; i < blend; i++) {
-                float t = 1 - (i+1)/(float)(blend+1);
-                heights[WIDTH-1-i] = (int)(raw[WIDTH-1-i]*(1-t) + ih*t);
+                float t = 1 - (i + 1) / (float) (blend + 1);
+                heights[WIDTH - 1 - i] = (int) (raw[WIDTH - 1 - i] * (1 - t) + ih * t);
             }
         }
     }
 
     public void generateStructures(int globalX, int y, BiomeType biome) {
-        // TREES
-        if (biome == BiomeType.FOREST) {
-            world.queueStructure("Tree.tmx", globalX - 2, y + 1, 6);
-        } else if (biome == BiomeType.PLAINS) {
-            world.queueStructure("Tree.tmx", globalX - 2, y + 1, 10);
+        for (Structure s : biome.getStructures()) {
+            long structureSeed = computeStructureSeed(globalX, y, s);
+            Random rand = new Random(structureSeed);
+            if (rand.nextFloat() < s.getSpawnProbability()) {
+                int spawnX = globalX - s.getTrunkXOffset();
+                world.queueStructure(
+                    s.getFilePath(),
+                    spawnX,
+                    y + s.getTrunkYOffset(),
+                    s.getMinDistance()
+                );
+            }
         }
+    }
+
+    private long computeStructureSeed(int x, int y, Structure s) {
+        long seed = Settings.SEED;
+        seed = seed * 31L + x;
+        seed = seed * 31L + y;
+        seed = seed * 31L + s.getFilePath().hashCode();
+        return seed;
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("Chunk[x=").append(chunkX).append("]\n");
-        for (int y = HEIGHT-1; y >= 0; y--) {
+        for (int y = HEIGHT - 1; y >= 0; y--) {
             for (int x = 0; x < WIDTH; x++) {
                 sb.append(blocks[x][y].name().charAt(0));
             }
-            sb.append('\n');
+            sb.append("\n");
         }
         return sb.toString();
     }

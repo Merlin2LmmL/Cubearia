@@ -61,7 +61,7 @@ public class Player extends Entity {
         this.inventory = inventory;
         inventory.addItem(Item.valueOf("DIRT"), 576);
         inventory.addItem(Item.valueOf("DIRT"), 576);
-        inventory.addItem(Item.valueOf("DIRT"), 64);
+        inventory.addItem(Item.valueOf("LAVA"), 64);
         // Prepare texture regions
         headRegion = new TextureRegion(Assets.playerTexture, 6, 0, 8, 8);
         bodyRegion = new TextureRegion(Assets.playerTexture, 0, 0, 6, 12);
@@ -74,8 +74,8 @@ public class Player extends Entity {
     @Override
     public void update(float delta) {
         if (Gdx.input.isKeyJustPressed(Input.Keys.B)) {
-            y = 70;
-            x = (float) Math.random() * 1000;
+            y = 120;
+            x = (float) (Math.random() - 0.5) * 20000;
         }
         stateTime += delta;
 
