@@ -3,6 +3,13 @@ buildscript {
   repositories {
     gradlePluginPortal()
   }
+  ext {
+    gdxVersion = '1.12.1'
+    appName = 'cubearia'
+    projectVersion = 'alpha-1.01'
+    enableGraalNative = 'false'
+  }
+
   dependencies {
     classpath "io.github.fourlastor:construo:1.7.1"
     if(enableGraalNative == 'true') {

@@ -128,7 +128,7 @@ public class Player extends Entity {
                 velocityY = jumpVelocity;
                 onGround = false;
             } else if (inWater) {
-                velocityY += 0.1f;
+                velocityY += 0.5f;
             }
         }
 

@@ -22,11 +22,11 @@ public class Renderer {
         }
 
         // 2. Alle geladenen Chunks rendern
-        for (Map.Entry<Integer, Chunk> entry : world.chunks.entrySet()) {
+        for (Map.Entry<Integer, Chunk> entry : world.getChunks().entrySet()) {
             int chunkX = entry.getKey();
             Chunk chunk = entry.getValue();
 
-            if (chunkX >= (player.x / 16 - 1) - Settings.RENDERDISTANCE && chunkX <= (player.x / 16) + Settings.RENDERDISTANCE) {
+            if (chunkX >= (player.x / 16) - Settings.RENDERDISTANCE && chunkX <= (player.x / 16) + Settings.RENDERDISTANCE) {
                 for (int lx = 0; lx < Chunk.WIDTH; lx++) {
                     for (int y = 0; y < Chunk.HEIGHT; y++) {
                         int gx = chunkX * Chunk.WIDTH + lx;
@@ -120,7 +120,7 @@ public class Renderer {
 
     private static BlockType getBlockAt(World world, int gx, int gy) {
         int chunkX = Math.floorDiv(gx, Chunk.WIDTH);
-        Chunk chunk = world.chunks.get(chunkX);
+        Chunk chunk = world.getChunks().get(chunkX);
         if (chunk == null || gy < 0 || gy >= Chunk.HEIGHT) return BlockType.DIRT; // treat as solid to block flood
         int lx = Math.floorMod(gx, Chunk.WIDTH);
         return chunk.blocks[lx][gy];
