@@ -1,5 +1,6 @@
 package com.example.cubearia.game.world;
 
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.example.cubearia.game.Assets;
@@ -26,7 +27,8 @@ public class Renderer {
             int chunkX = entry.getKey();
             Chunk chunk = entry.getValue();
 
-            if (chunkX >= (player.x / 16) - Settings.RENDERDISTANCE && chunkX <= (player.x / 16) + Settings.RENDERDISTANCE) {
+            if (chunkX >= (player.x / Chunk.WIDTH) - Settings.RENDERDISTANCE &&
+                chunkX <= (player.x / Chunk.WIDTH) + Settings.RENDERDISTANCE) {
                 for (int lx = 0; lx < Chunk.WIDTH; lx++) {
                     for (int y = 0; y < Chunk.HEIGHT; y++) {
                         int gx = chunkX * Chunk.WIDTH + lx;
@@ -36,7 +38,8 @@ public class Renderer {
                         boolean isAir = type == BlockType.AIR;
 
                         // Alle Blöcke sind sichtbar, wenn RENDERALLBLOCKS wahr ist
-                        boolean isVisible = Settings.RENDERALLBLOCKS || visibleAir.contains(p) || (!isAir && hasAdjacentVisibleAir(p, visibleAir));
+                        boolean isVisible = Settings.RENDERALLBLOCKS || visibleAir.contains(p) ||
+                            (!isAir && hasAdjacentVisibleAir(p, visibleAir));
 
                         float dstX = gx * TILE_SIZE;
                         float dstY = gy * TILE_SIZE;
@@ -53,11 +56,29 @@ public class Renderer {
                                     dstX, dstY, TILE_SIZE, TILE_SIZE);  // Zeichne die Region an der gewünschten Position
                             }
                         } else if (!Settings.RENDERALLBLOCKS) {
-                                batch.draw(Assets.blackPixel, dstX, dstY, TILE_SIZE, TILE_SIZE);
+                            batch.draw(Assets.blackPixel, dstX, dstY, TILE_SIZE, TILE_SIZE);
                         }
                     }
                 }
             }
+        }
+
+        // Debug: dünne grüne Linien zwischen den Chunk-Grenzen
+        if (Settings.DEBUG) {
+            // Berechne Spieler-Chunk-Index
+            int playerChunkX = Math.floorDiv((int) player.x, Chunk.WIDTH);
+            int minBoundary = playerChunkX - Settings.RENDERDISTANCE;
+            int maxBoundary = playerChunkX + Settings.RENDERDISTANCE + 1;
+            float worldHeightPixels = Chunk.HEIGHT * TILE_SIZE;
+
+            // Farbzustand sichern und setzen
+            batch.setColor(Color.GREEN);
+            for (int boundary = minBoundary; boundary <= maxBoundary; boundary++) {
+                float lineX = boundary * Chunk.WIDTH * TILE_SIZE;
+                // Ziehe eine 1px breite Linie entlang der y-Achse mit weißem Pixel, damit die Färbung sichtbar ist
+                batch.draw(Assets.whitePixel, lineX, 0, 1, worldHeightPixels);
+            }
+            batch.setColor(Color.WHITE);
         }
     }
 
@@ -125,5 +146,4 @@ public class Renderer {
         int lx = Math.floorMod(gx, Chunk.WIDTH);
         return chunk.blocks[lx][gy];
     }
-
 }

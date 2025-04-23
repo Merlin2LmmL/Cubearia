@@ -19,6 +19,7 @@ public class Assets {
     public static Texture        slotBackground;
     public static Texture        inventoryBackground;
     public static Texture        blackPixel;
+    public static Texture        whitePixel;
 
     public static TextureRegion[] breakingFrames;
     public static Animation<TextureRegion> breakingAnimation;
@@ -41,11 +42,17 @@ public class Assets {
         }
 
         // 2) Generiere den Black Pixel
-        Pixmap pix = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        pix.setColor(Color.BLACK);
-        pix.fill();
-        blackPixel = new Texture(pix);
-        pix.dispose();
+        Pixmap pix1 = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pix1.setColor(Color.BLACK);
+        pix1.fill();
+        blackPixel = new Texture(pix1);
+        pix1.dispose();
+
+        Pixmap pix2 = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pix2.setColor(Color.WHITE);
+        pix2.fill();
+        whitePixel = new Texture(pix2);
+        pix2.dispose();
 
         // 3) Lade andere Assets
         playerTexture = new Texture(Gdx.files.internal("Player.png"));

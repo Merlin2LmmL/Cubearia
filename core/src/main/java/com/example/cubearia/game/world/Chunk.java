@@ -39,8 +39,8 @@ public class Chunk {
 
                     if (!surfaceDone && y == terrainHeight - 1) {
                         int globalX = chunkX * WIDTH + x;
-                        if (!Settings.FLATWORLD && MathUtils.random(1,10) == 1) {
-                            world.queueStructure("Tree.tmx", globalX - 3, y + 1);
+                        if (Settings.STRUCTURES) {
+                            generateStructures(globalX, y, biome);
                         }
                         surfaceDone = true;
                     }
@@ -92,6 +92,15 @@ public class Chunk {
                 float t = 1 - (i+1)/(float)(blend+1);
                 heights[WIDTH-1-i] = (int)(raw[WIDTH-1-i]*(1-t) + ih*t);
             }
+        }
+    }
+
+    public void generateStructures(int globalX, int y, BiomeType biome) {
+        // TREES
+        if (biome == BiomeType.FOREST) {
+            world.queueStructure("Tree.tmx", globalX - 2, y + 1, 6);
+        } else if (biome == BiomeType.PLAINS) {
+            world.queueStructure("Tree.tmx", globalX - 2, y + 1, 10);
         }
     }
 

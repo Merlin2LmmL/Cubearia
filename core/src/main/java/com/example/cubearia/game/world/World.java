@@ -10,10 +10,14 @@ import com.example.cubearia.game.entities.Entity;
 import java.util.*;
 
 public class World {
-    private final HashMap<Integer, Chunk> chunks = new HashMap<>();
+    private final Map<Integer, Chunk> chunks = new HashMap<>();
     private final List<Entity> entities = new ArrayList<>();
+
+    // Wartende Strukturen (Originpunkte)
     private final List<PendingStructure> pendingStructures = new ArrayList<>();
-    private final int MIN_STRUCTURE_DISTANCE = 10;
+    // Bereits platzierte Strukturen (für Abstandskontrolle)
+    private final List<PlacedStructure> placedStructures = new ArrayList<>();
+
     private static final int MAX_CHUNK_DISTANCE = 8;
     private boolean loadingStructure = false;              // Lock-Flag während loadStructure
 
@@ -28,23 +32,13 @@ public class World {
         return chunk.blocks[localX][y];
     }
 
-    // Setzt einen Block (öffnet ggfs. neuen Chunk)
+    // Setzt einen Block (öffnet ggf. neuen Chunk)
     public void setBlock(int globalX, int y, BlockType type) {
         int chunkX = Math.floorDiv(globalX, Chunk.WIDTH);
         int localX = Math.floorMod(globalX, Chunk.WIDTH);
         Chunk chunk = getOrCreateChunk(chunkX);
         if (y < 0 || y >= Chunk.HEIGHT) return;
         chunk.blocks[localX][y] = type;
-    }
-
-    // Vermeidet Stack-Overflow: schreibt nur, wenn Chunk schon existiert
-    private void setBlockIfLoaded(int globalX, int y, BlockType type) {
-        int chunkX = Math.floorDiv(globalX, Chunk.WIDTH);
-        int localX = Math.floorMod(globalX, Chunk.WIDTH);
-        Chunk chunk = chunks.get(chunkX);
-        if (chunk != null && y >= 0 && y < Chunk.HEIGHT) {
-            chunk.blocks[localX][y] = type;
-        }
     }
 
     public void update(float delta) {
@@ -78,55 +72,69 @@ public class World {
 
     public void updateAroundPlayer(float playerX) {
         int center = (int)Math.floor(playerX / Chunk.WIDTH);
-        for (int dx = -2*Settings.RENDERDISTANCE; dx <= 2*Settings.RENDERDISTANCE; dx++) {
+        for (int dx = -2 * Settings.RENDERDISTANCE; dx <= 2 * Settings.RENDERDISTANCE; dx++) {
             getOrCreateChunk(center + dx);
         }
         chunks.entrySet().removeIf(e -> Math.abs(e.getKey() - center) > MAX_CHUNK_DISTANCE);
     }
 
+    /**
+     * Queued mit Standard-Abstand von 10 Blöcken.
+     */
     public void queueStructure(String file, int globalX, int globalY) {
-        if (loadingStructure) return;  // keine neuen Anfragen während des Ladens
+        queueStructure(file, globalX, globalY, 10);
+    }
+
+    /**
+     * Queue eine Struktur, Abstand wird gegen alle Strukturen geprüft.
+     */
+    public void queueStructure(String file, int globalX, int globalY, int minDistance) {
+        if (loadingStructure) return;
+        long minDistSq = (long)minDistance * minDistance;
         for (PendingStructure ps : pendingStructures) {
-            if (Math.abs(ps.globalX - globalX) < MIN_STRUCTURE_DISTANCE &&
-                Math.abs(ps.globalY - globalY) < 5) {
-                return;
-            }
+            if (distanceSquared(ps.globalX, ps.globalY, globalX, globalY) < minDistSq) return;
+        }
+        for (PlacedStructure ps : placedStructures) {
+            if (distanceSquared(ps.globalX, ps.globalY, globalX, globalY) < minDistSq) return;
         }
         pendingStructures.add(new PendingStructure(file, globalX, globalY));
     }
 
     private void tryApplyPendingStructures(int chunkX) {
-        // Nur auf diesen Chunk anwenden, wenn passend
         Iterator<PendingStructure> it = pendingStructures.iterator();
         while (it.hasNext()) {
             PendingStructure ps = it.next();
             if (Math.floorDiv(ps.globalX, Chunk.WIDTH) == chunkX) {
                 loadStructure(ps.file, ps.globalX, ps.globalY);
+                placedStructures.add(new PlacedStructure(ps.file, ps.globalX, ps.globalY));
                 it.remove();
             }
         }
     }
 
     private void processPendingStructures(int chunkX) {
-        // Analog zu tryApply, falls später geladen
         Iterator<PendingStructure> it = pendingStructures.iterator();
         int startX = chunkX * Chunk.WIDTH;
         int endX   = startX + Chunk.WIDTH;
         while (it.hasNext()) {
             PendingStructure ps = it.next();
+            // wenn Origin innerhalb dieses Chunk-Bereichs
             if (ps.globalX >= startX && ps.globalX < endX) {
                 loadStructure(ps.file, ps.globalX, ps.globalY);
+                placedStructures.add(new PlacedStructure(ps.file, ps.globalX, ps.globalY));
                 it.remove();
             }
         }
     }
 
-    public void loadStructure(String mapFile, int startX, int startY) {
+    /**
+     * Lädt Struktur und schreibt Blöcke in alle betroffenen Chunks durch setBlock().
+     */
+    private void loadStructure(String mapFile, int startX, int startY) {
         loadingStructure = true;
-
         TmxMapLoader loader = new TmxMapLoader();
         TiledMap map = loader.load(mapFile);
-        TiledMapTileLayer layer = (TiledMapTileLayer)map.getLayers().get(0);
+        TiledMapTileLayer layer = (TiledMapTileLayer) map.getLayers().get(0);
 
         for (int x = 0; x < layer.getWidth(); x++) {
             for (int y = 0; y < layer.getHeight(); y++) {
@@ -134,36 +142,33 @@ public class World {
                 if (cell != null) {
                     int tileId = cell.getTile().getId();
                     BlockType block = BlockType.getById(tileId - 1);
-                    setBlockIfLoaded(startX + x, startY + y, block);
+                    // setBlock erzeugt ggf. neue Chunks automatisch
+                    setBlock(startX + x, startY + y, block);
                 }
             }
         }
-
         loadingStructure = false;
     }
 
     public BiomeType getBiomeTypeAt(int globalX) {
-        return Settings.FLATWORLD
-            ? BiomeType.PLAINS
-            : biomeGenerator.getBiomeAt(globalX);
+        return Settings.FLATWORLD ? BiomeType.PLAINS : biomeGenerator.getBiomeAt(globalX);
     }
 
-    public void addEntity(Entity e) {
-        entities.add(e);
-    }
-
-    public List<Entity> getEntities() {
-        return entities;
-    }
+    public void addEntity(Entity e) { entities.add(e); }
+    public List<Entity> getEntities()    { return entities; }
 
     private static class PendingStructure {
-        String file;
-        int globalX, globalY;
-        PendingStructure(String file, int gx, int gy) {
-            this.file = file;
-            this.globalX = gx;
-            this.globalY = gy;
-        }
+        String file; int globalX, globalY;
+        PendingStructure(String file, int gx, int gy) { this.file = file; this.globalX = gx; this.globalY = gy; }
+    }
+    private static class PlacedStructure {
+        String file; int globalX, globalY;
+        PlacedStructure(String file, int gx, int gy) { this.file = file; this.globalX = gx; this.globalY = gy; }
+    }
+
+    private long distanceSquared(int x1, int y1, int x2, int y2) {
+        long dx = x1 - x2, dy = y1 - y2;
+        return dx*dx + dy*dy;
     }
 
     public Map<Integer, Chunk> getChunks() {
