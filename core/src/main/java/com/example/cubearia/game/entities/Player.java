@@ -35,7 +35,7 @@ public class Player extends Entity {
     public boolean inMenu;
 
     public boolean onGround = false;
-    private boolean inWater = false;
+    private boolean inFluid = false;
 
     private float stateTime = 0f;
     private float walkCycleTime = 0f;
@@ -92,7 +92,7 @@ public class Player extends Entity {
             }
         }
 
-        checkWaterState();
+        checkFluidState();
 
         // Walk Cycle
         if (velocityX != 0) {
@@ -119,7 +119,7 @@ public class Player extends Entity {
             if (!left && !right) applyFriction(delta / 10);
         }
 
-        float maxSpeed = onGround ? finalmaxSpeed : inWater ? finalmaxSpeed * 0.5f : finalmaxSpeed * 1.2f;
+        float maxSpeed = onGround ? finalmaxSpeed : inFluid ? finalmaxSpeed * 0.5f : finalmaxSpeed * 1.2f;
         maxSpeed = ((facingLeft() ? true : false) == (left ? true : false)) ? maxSpeed : maxSpeed * 0.5f;
         velocityX = MathUtils.clamp(velocityX, -maxSpeed, maxSpeed);
 
@@ -127,17 +127,17 @@ public class Player extends Entity {
             if (onGround) {
                 velocityY = jumpVelocity;
                 onGround = false;
-            } else if (inWater) {
+            } else if (inFluid) {
                 velocityY += 0.5f;
             }
         }
 
-        if (inWater) {
+        if (inFluid) {
             velocityY += gravity * 0.2f * delta; // weniger Gravitation im Wasser
             if (world.getBlock((int) x, (int) (Math.round(y + 0.25f))) == BlockType.WATER) {
-                velocityY = MathUtils.clamp(velocityY, -4f, 8f); // nicht zu schnell fallen
+                velocityY = MathUtils.clamp(velocityY, -3f, 3f); // nicht zu schnell fallen
             } else {
-                velocityY = MathUtils.clamp(velocityY, -4f, 4f); // nicht zu schnell fallen
+                velocityY = MathUtils.clamp(velocityY, -3f, 3f); // nicht zu schnell fallen
             }
         } else {
             velocityY += gravity * delta;
@@ -163,10 +163,6 @@ public class Player extends Entity {
 
     // Bewegung und Block-Kollisionen
     private void moveWithCollision(float delta) {
-        // Save old pos
-        float oldX = x;
-        float oldY = y;
-
         // Move X
         x += velocityX * delta;
         if (checkCollision()) {
@@ -203,14 +199,8 @@ public class Player extends Entity {
         return false;
     }
 
-    private void checkWaterState() {
-        int ix = (int) Math.floor(x);
-        int iy = (int) Math.floor(y + 0.25f);  // je nachdem, wo sich dein Spieler „fühlt“
-
-        // 1) Bist du überhaupt in Wasser?
-        boolean atWaterLevel    = world.getBlock(ix, iy)     == BlockType.WATER;
-        boolean justAboveWater  = world.getBlock(ix, iy + 1) == BlockType.WATER;
-        inWater = atWaterLevel || justAboveWater;
+    private void checkFluidState() {
+        inFluid = world.getBlock((int) x, (int) y).isFluid();
     }
 
     public boolean isInRange(int blockX, int blockY) {

@@ -70,6 +70,7 @@ public class World {
      */
     public Chunk getOrCreateChunk(int chunkX) {
         if (!chunks.containsKey(chunkX)) {
+            System.out.println(chunkX);
             int baseX = chunkX * Chunk.WIDTH;
             BiomeType left  = getBiomeTypeAt(baseX - Chunk.WIDTH);
             BiomeType curr  = getBiomeTypeAt(baseX);

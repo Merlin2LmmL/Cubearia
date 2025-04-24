@@ -98,13 +98,13 @@ public class Renderer {
         Point start = new Point(startX, startY);
         BlockType startBlock = getBlockSafe(world, startX, startY);
 
-        if (startBlock == null || startBlock.isSolid()) {
+        if (startBlock == null || !startBlock.isTransparent()) {
             boolean found = false;
             for (int i = 0; i < 4; i++) {
                 int nx = startX + DX[i];
                 int ny = startY + DY[i];
                 BlockType neighbor = getBlockSafe(world, nx, ny);
-                if (neighbor != null && !neighbor.isSolid()) {
+                if (neighbor != null && neighbor.isTransparent()) {
                     startX = nx;
                     startY = ny;
                     start = new Point(startX, startY);
@@ -129,7 +129,7 @@ public class Renderer {
 
                 Point neighbor = new Point(nx, ny);
                 BlockType block = getBlockSafe(world, nx, ny);
-                if (block != null && !block.isSolid() && !visited.contains(neighbor)) {
+                if (block != null && block.isTransparent() && !visited.contains(neighbor)) {
                     visited.add(neighbor);
                     queue.add(neighbor);
                 }
@@ -139,10 +139,10 @@ public class Renderer {
         return visited;
     }
 
-    private static boolean hasAdjacentVisibleAir(Point cell, Set<Point> visibleAir) {
+    private static boolean hasAdjacentVisibleAir(Point cell, Set<Point> visible) {
         for (int i = 0; i < DX.length; i++) {
             Point np = new Point(cell.x + DX[i], cell.y + DY[i]);
-            if (visibleAir.contains(np)) return true;
+            if (visible.contains(np)) return true;
         }
         return false;
     }

@@ -7,7 +7,7 @@ import java.util.Random;
  * Ein Chunk repräsentiert einen Abschnitt der Welt mit Terrain und optionalen Strukturen.
  */
 public class Chunk {
-    public static final int WIDTH  = 16;
+    public static final int WIDTH  = 32;
     public static final int HEIGHT = 128;
 
     public final BlockType[][] blocks = new BlockType[WIDTH][HEIGHT];
@@ -18,13 +18,6 @@ public class Chunk {
         this.chunkX = chunkX;
         this.world  = world;
         generateTerrain(prevBiome, biome, nextBiome);
-    }
-
-    /**
-     * Gibt die aktuelle Chunk-Koordinate.
-     */
-    public int getChunkX() {
-        return chunkX;
     }
 
     /**
@@ -56,6 +49,12 @@ public class Chunk {
                             generateStructures(globalX, y, biome);
                         }
                         surfaceDone = true;
+                    }
+                } else if (y == Settings.SEA_LEVEL) {
+                    if (biome == BiomeType.COLD_OCEAN || biome == BiomeType.COLD_SHALLOW_OCEAN) {
+                        blocks[x][y] = BlockType.ICE_BLOCK;
+                    } else {
+                        blocks[x][y] = BlockType.WATER;
                     }
                 } else if (y < Settings.SEA_LEVEL) {
                     blocks[x][y] = BlockType.WATER;

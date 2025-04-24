@@ -1,10 +1,12 @@
 package com.example.cubearia.game.inventory;
 
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.example.cubearia.game.entities.Entity;
 import com.example.cubearia.game.GameScreen;
 import com.example.cubearia.game.entities.Player;
+import com.example.cubearia.game.world.BlockType;
 import com.example.cubearia.game.world.World;
 
 public class DroppedItem extends Entity {
@@ -18,6 +20,7 @@ public class DroppedItem extends Entity {
     public final float gravity = -10f;
     public boolean onGround = false;
     public final float friction = 100f;
+    private boolean inFluid = false;
 
     public DroppedItem(World world, float x, float y, Item item, float velocityX, float velocityY, int quantity) {
         super(x, y, 0.5f, 0.5f);
@@ -31,7 +34,20 @@ public class DroppedItem extends Entity {
     @Override
     public void update(float delta) {
         lifetime += delta;
-        velocityY += gravity * delta;
+
+        checkFluidState();
+
+        if (inFluid) {
+            velocityY += gravity * 0.2f * delta; // weniger Gravitation im Wasser
+            if (world.getBlock((int) x, (int) (Math.round(y + 0.25f))) == BlockType.WATER) {
+                velocityY = MathUtils.clamp(velocityY, -3f, 3f); // nicht zu schnell fallen
+            } else {
+                velocityY = MathUtils.clamp(velocityY, -3f, 3f); // nicht zu schnell fallen
+            }
+        } else {
+            velocityY += gravity * delta;
+        }
+
         applyFriction(delta);
         moveWithCollision(delta);
         if (lifetime >= MAX_LIFETIME) {
@@ -113,6 +129,10 @@ public class DroppedItem extends Entity {
             }
         }
         return false;
+    }
+
+    private void checkFluidState() {
+        inFluid = world.getBlock((int) x, (int) y).isFluid();
     }
 
     private void applyFriction(float frictionAmount) {

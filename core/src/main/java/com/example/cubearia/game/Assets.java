@@ -11,7 +11,6 @@ import com.example.cubearia.game.world.BlockType;
 
 public class Assets {
     public static TilesetLoader  tileset;
-    public static Texture        blockTexture;
     public static Texture        playerTexture;
     public static Texture        slotBackground;
     public static Texture        inventoryBackground;
@@ -21,15 +20,9 @@ public class Assets {
     public static TextureRegion[] breakingFrames;
     public static Animation<TextureRegion> breakingAnimation;
 
-    // Maps
-    public static OrthogonalTiledMapRenderer cactiMapRenderer;
-    public static OrthogonalTiledMapRenderer iceSpikeMapRenderer;
-    public static OrthogonalTiledMapRenderer lavaSeaMapRenderer;
-    public static OrthogonalTiledMapRenderer treeMapRenderer;
-
     public static void load() {
         // 1) Lade das Tileset
-        tileset = new TilesetLoader("maps/Blocks.tsx");
+        tileset = new TilesetLoader("Blocks.tsx");
         for (BlockType block : BlockType.values()) {
             block.resolve(tileset);
         }
@@ -63,16 +56,9 @@ public class Assets {
 
     public static void dispose() {
         // Entsorge alle Assets
-        blockTexture.dispose();
         playerTexture.dispose();
         slotBackground.dispose();
         inventoryBackground.dispose();
-
-        cactiMapRenderer.dispose();
-        iceSpikeMapRenderer.dispose();
-        lavaSeaMapRenderer.dispose();
-        treeMapRenderer.dispose();
-
         // Entsorge das Breaking-Animation-Sheet
         breakingAnimation.getKeyFrames()[0].getTexture().dispose();  // Entsorge die Textur der Animation
     }
