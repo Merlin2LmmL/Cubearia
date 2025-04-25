@@ -1,9 +1,6 @@
 package com.example.cubearia.ui;
 
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.Rectangle;
-import com.example.cubearia.game.Settings;
 
 public class SlotRegion {
     private final int index;
@@ -15,7 +12,8 @@ public class SlotRegion {
         INVENTORY,
         HOTBAR,
         ARMOR,
-        CRAFTING,
+        CRAFTING2x2,
+        CRAFTING3x3,
         OUTPUT,
         INPUT,
         FUEL
