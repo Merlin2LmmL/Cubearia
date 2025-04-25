@@ -1,56 +1,136 @@
 package com.example.cubearia.ui;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import com.badlogic.gdx.graphics.Camera;
-import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.math.Vector3;
-import com.example.cubearia.game.Assets;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.example.cubearia.game.entities.Player;
+import com.example.cubearia.game.inventory.Inventory;
+import com.example.cubearia.game.inventory.crafting.DefaultRecipes;
+import com.example.cubearia.game.inventory.crafting.RecipeRegistry;
+import com.example.cubearia.game.world.World;
 
+/**
+ * Verwalter für alle UI-Komponenten und Input-Routing.
+ */
 public class UIManager {
-    private static Player player;
-    private static OrthographicCamera uiCamera;
+    private final Player player;
+    private final OrthographicCamera uiCamera;
+    private final World world;
+    private final Inventory inventory;
+    private final RecipeRegistry recipeRegistry;
+    private final InventoryUI inventoryUI;
+    private final CraftingMenuUI craftingMenuUI;
+    private final HotbarUI hotbarUI;
 
-    private static InventoryUI inventoryUI;
-    private static HotbarUI hotbarUI;
+    private boolean inventoryOpen = false;
+    private boolean craftingTableOpen = false;
 
-    public UIManager(Player player, OrthographicCamera uiCamera) {
+    /**
+     * Konstruktor initialisiert Rezepte und alle UI-Komponenten.
+     */
+    public UIManager(Player player,
+                     OrthographicCamera uiCamera,
+                     World world,
+                     Inventory inventory) {
         this.player = player;
         this.uiCamera = uiCamera;
+        this.world = world;
+        this.inventory = inventory;
 
-        inventoryUI = new InventoryUI(player.getInventory());
-        hotbarUI = new HotbarUI(player.getInventory()
-        );
+        this.recipeRegistry = new RecipeRegistry();
+        DefaultRecipes.registerAll(this.recipeRegistry);
+
+        this.inventoryUI    = new InventoryUI(inventory, recipeRegistry);
+        this.craftingMenuUI = new CraftingMenuUI(inventory, recipeRegistry);
+        this.hotbarUI       = new HotbarUI(inventory);
     }
 
-    /** Maus gedrückt */
+    /**
+     * Routen des Maus-Down-Events an die aktive Container-UI.
+     */
     public void pressClick(int screenX, int screenY, int button) {
-        // schauen, dass es wirklich Linksklick ist und Inventar offen
-        if (button == Input.Buttons.LEFT && player.inventoryOpen) {
-            // NICHT hier unprojecten!
-            inventoryUI.handleTouchDown(screenX, screenY, uiCamera);
-        }
+        routeTouchDown(screenX, screenY, button);
     }
 
-    /** Maus losgelassen */
+    /**
+     * Routen des Maus-Up-Events an die aktive Container-UI.
+     */
     public void releaseClick(int screenX, int screenY, int button) {
-        if (button == Input.Buttons.LEFT && player.inventoryOpen) {
-            inventoryUI.handleTouchUp(screenX, screenY, uiCamera);
+        routeTouchUp(screenX, screenY, button);
+    }
+
+    /**
+     * Helper für TouchDown-Routing.
+     */
+    private void routeTouchDown(int screenX, int screenY, int button) {
+        if (button == Input.Buttons.LEFT || button == Input.Buttons.RIGHT) {
+            boolean left = (button == Input.Buttons.LEFT);
+            AbstractContainerUI active = inventoryOpen ? inventoryUI
+                : craftingTableOpen ? craftingMenuUI
+                : null;
+            if (active != null) {
+                active.handleTouchDown(screenX, screenY, uiCamera, left);
+                player.inMenu = true;
+            }
         }
     }
 
-    /** Diese Methode steuert nur das Rendern bzw. Maus‑Icon */
-    public void updateMousePosition(float screenX, float screenY) {
-        inventoryUI.updateMousePosition(screenX, screenY, uiCamera);
+    /**
+     * Helper für TouchUp-Routing.
+     */
+    private void routeTouchUp(int screenX, int screenY, int button) {
+        if (button == Input.Buttons.LEFT || button == Input.Buttons.RIGHT) {
+            AbstractContainerUI active = inventoryOpen ? inventoryUI
+                : craftingTableOpen ? craftingMenuUI
+                : null;
+            if (active != null) {
+                active.handleTouchUp(screenX, screenY, uiCamera);
+                player.inMenu = true;
+            }
+        }
     }
 
-    public static void render(SpriteBatch batch) {
-        if (player.inventoryOpen) {
+    /**
+     * Toggle des Inventar-Bildschirms.
+     */
+    public void toggleInventory() {
+        inventoryOpen = !inventoryOpen;
+        craftingTableOpen = false;
+        player.inMenu = inventoryOpen;
+        if (!inventoryOpen) {
+            inventory.dropCraftingAndClear(player, world);
+        }
+    }
+
+    /**
+     * Toggle des Crafting-Tisch-Bildschirms.
+     */
+    public void toggleCraftingTable() {
+        craftingTableOpen = !craftingTableOpen;
+        inventoryOpen = false;
+        player.inMenu = craftingTableOpen;
+        if (!craftingTableOpen) {
+            inventory.dropCraftingAndClear(player, world);
+        }
+    }
+
+    /**
+     * Render-Routinen für die aktive UI (Inventar, Crafting oder Hotbar).
+     */
+    public void render(SpriteBatch batch) {
+        if (inventoryOpen) {
             inventoryUI.render(batch, uiCamera);
+        } else if (craftingTableOpen) {
+            craftingMenuUI.render(batch, uiCamera);
         } else {
             hotbarUI.render(batch, uiCamera, player.selectedSlot);
         }
+    }
+
+    /**
+     * Optional: Weiterleitung für Maus-Position (z.B. Tooltip-Follow).
+     */
+    public void updateMousePosition(float screenX, float screenY) {
+        // Bei Bedarf implementieren
     }
 }

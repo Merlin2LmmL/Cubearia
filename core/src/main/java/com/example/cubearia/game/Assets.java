@@ -14,6 +14,7 @@ public class Assets {
     public static Texture        playerTexture;
     public static Texture        slotBackground;
     public static Texture        inventoryBackground;
+    public static Texture        craftingTableBackground;
     public static Texture        blackPixel;
     public static Texture        whitePixel;
 
@@ -44,6 +45,7 @@ public class Assets {
         playerTexture = new Texture(Gdx.files.internal("Player.png"));
         slotBackground = new Texture(Gdx.files.internal("ui/SlotBackground.png"));
         inventoryBackground = new Texture(Gdx.files.internal("ui/InventoryBackground.png"));
+        craftingTableBackground = new Texture(Gdx.files.internal("ui/CraftingTableBackground.png"));
 
         // 4) Lade die Animation für den Breaking-Effekt
         Texture breakingSheet = new Texture(Gdx.files.internal("BreakingAnimation.png"));
@@ -59,6 +61,7 @@ public class Assets {
         playerTexture.dispose();
         slotBackground.dispose();
         inventoryBackground.dispose();
+        craftingTableBackground.dispose();
         // Entsorge das Breaking-Animation-Sheet
         breakingAnimation.getKeyFrames()[0].getTexture().dispose();  // Entsorge die Textur der Animation
     }

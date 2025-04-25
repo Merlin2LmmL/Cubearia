@@ -1,7 +1,14 @@
 package com.example.cubearia.game.inventory;
 
+import com.example.cubearia.game.inventory.DroppedItem;
+import com.example.cubearia.game.entities.Player;
+import com.example.cubearia.game.world.World;
+
 public class Inventory {
     private final ItemStack[] slots;
+    private final ItemStack[] armorSlots;         // neu: Rüstungsslots
+    private final ItemStack[] craftingInputs;      // neu: 2x2 Crafting-Input
+    private ItemStack craftingOutput;
     private final int columns;
     private final int rows;
 
@@ -9,14 +16,13 @@ public class Inventory {
         this.columns = columns;
         this.rows = rows;
         this.slots = new ItemStack[columns * rows];
+        this.armorSlots = new ItemStack[4];           // Kopf, Brust, Hose, Schuhe
+        this.craftingInputs = new ItemStack[9];        // 2x2 Grid
+    }
+    public ItemStack getSlot(int index) {
+        return (index >= 0 && index < slots.length) ? slots[index] : null;
     }
 
-    /**
-     * Versucht, `amount` Items vom Typ `item` einzufügen.
-     * @param item   der Item-Typ
-     * @param amount Anzahl der einzufügenden Items
-     * @return 0, wenn alle Items eingefügt wurden; sonst Anzahl der Items, die nicht untergekommen sind
-     */
     public int addItem(Item item, int amount) {
         // 1) Erst vorhandene Stacks befüllen
         for (int i = 0; i < slots.length && amount > 0; i++) {
@@ -42,15 +48,6 @@ public class Inventory {
 
         // Menge, die nicht eingefügt werden konnte
         return amount;
-    }
-
-    /**
-     * Liest den ItemStack an der gegebenen Position.
-     * @param index Slot-Index
-     * @return der ItemStack oder null, wenn leer/ungültig
-     */
-    public ItemStack getSlot(int index) {
-        return (index >= 0 && index < slots.length) ? slots[index] : null;
     }
 
     /**
@@ -100,5 +97,90 @@ public class Inventory {
     /** Gesamtanzahl der Slots. */
     public int getTotalSlots() {
         return slots.length;
+    }
+
+    /** Rüstungs-Slot lesen/setzen */
+    public ItemStack getArmorSlot(int index) {
+        if (index >= 0 && index < armorSlots.length) {
+            return armorSlots[index];
+        }
+        return null;
+    }
+    public void setArmorSlot(int index, ItemStack stack) {
+        if (index >= 0 && index < armorSlots.length) {
+            armorSlots[index] = stack;
+        }
+    }
+
+    /** Crafting-Input lesen/setzen */
+    public ItemStack getCraftingInput(int index) {
+        if (index >= 0 && index < craftingInputs.length) {
+            return craftingInputs[index];
+        }
+        return null;
+    }
+    public void setCraftingInput(int index, ItemStack stack) {
+        if (index >= 0 && index < craftingInputs.length) {
+            craftingInputs[index] = stack;
+        }
+    }
+
+    /** Beim Schließen: Crafting-Inhalte droppen */
+    public void dropCraftingAndClear(Player player, World world) {
+        // CraftingInputs
+        for (int i = 0; i < craftingInputs.length; i++) {
+            ItemStack stack = craftingInputs[i];
+            if (stack != null && !stack.isEmpty()) {
+                // Droppe gesamte Menge direkt
+                DroppedItem item = new DroppedItem (
+                    world,
+                    player.x, player.y,
+                    stack.getItem(),
+                    0f, 0f,
+                    stack.getAmount()
+                );
+                world.addEntity(item);
+                // Slot leeren
+                craftingInputs[i] = null;
+            }
+        }
+        // Crafting Output
+        ItemStack stack = craftingOutput;
+        if (stack != null && !stack.isEmpty()) {
+            // Droppe gesamte Menge direkt
+            DroppedItem item = new DroppedItem (
+                world,
+                player.x, player.y,
+                stack.getItem(),
+                0f, 0f,
+                stack.getAmount()
+            );
+            world.addEntity(item);
+            craftingOutput = null;
+        }
+    }
+
+    public ItemStack getCraftingOutput() {
+        return craftingOutput;
+    }
+
+    public void setCraftingOutput(ItemStack stack) {
+        craftingOutput = stack;
+    }
+
+    public void consumeInput(Item item, int count) {
+        int remaining = count;
+        for (int i = 0; i < craftingInputs.length && remaining > 0; i++) {
+            ItemStack stack = craftingInputs[i];
+            if (stack != null && stack.getItem().equals(item)) {
+                int taken = Math.min(stack.getAmount(), remaining);
+                stack.decrease(taken);
+                remaining -= taken;
+                if (stack.getAmount() <= 0) {
+                    craftingInputs[i] = null;
+                }
+            }
+        }
+        // Optional: falls count nicht komplett entnommen, könnte Log oder Exception
     }
 }

@@ -43,6 +43,10 @@ public class ItemStack {
         this.amount = amount;
     }
 
+    public ItemStack copy() {
+        return new ItemStack(this.item, this.amount);
+    }
+
     public void drawStack(SpriteBatch batch, float x, float y, float size) {
         float iconSize = size * 0.7f;
         float offset = size * 0.1f;

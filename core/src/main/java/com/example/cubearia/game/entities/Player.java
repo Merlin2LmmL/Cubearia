@@ -23,7 +23,7 @@ public class Player extends Entity {
     public float velocityY = 0f;
 
     public final float gravity = -25f;
-    public final float jumpVelocity = 7.5f;
+    public final float jumpVelocity = 8f;
     public final float moveAcceleration = 30f;
     public final float airControlFactor = 0.4f;
     public final float friction = 100f;
@@ -99,11 +99,6 @@ public class Player extends Entity {
             walkCycleTime += Math.abs(velocityX) * delta * (onGround ? 0.3f : 0.1f);
         } else {
             walkCycleTime = 0f;
-        }
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-            inventoryOpen = !inventoryOpen;
-            inMenu = !inMenu;
         }
 
         float accel = moveAcceleration * delta ;

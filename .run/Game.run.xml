@@ -4,6 +4,7 @@
     <option name="MAIN_CLASS_NAME" value="com.example.cubearia.lwjgl3.Lwjgl3Launcher" />
     <module name="Cubearia.lwjgl3.main" />
     <option name="PROGRAM_PARAMETERS" value="--stacktrace " />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/android/assets" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
