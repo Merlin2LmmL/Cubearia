@@ -8,13 +8,15 @@ public class Item {
     private final TextureRegion icon;
     private final int stackable;
     private final int type;
+    private final int toolLevel;
 
-    public Item(String id, String name, TextureRegion icon, int stackable, int type) {
+    public Item(String id, String name, TextureRegion icon, int stackable, int type, int toolLevel) {
         this.id = id;
         this.name = name;
         this.icon = icon;
         this.stackable = stackable;
         this.type = type;           // Types: 0=Block, 1=Crafting Item, 2=Tool/Weapon, 3=Armor
+        this.toolLevel = toolLevel;
     }
 
     public static Item valueOf(String value) {
@@ -44,6 +46,10 @@ public class Item {
 
     public int getType() {
         return type;
+    }
+
+    public int getToolLevel() {
+        return toolLevel;
     }
 
     @Override

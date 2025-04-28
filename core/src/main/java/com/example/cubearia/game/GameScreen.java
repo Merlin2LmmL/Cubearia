@@ -124,7 +124,7 @@ public class GameScreen implements Screen {
             uiManager.toggleInventory();
         }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+        if (getBlockAtCursor() == BlockType.CRAFTING_TABLE && Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT) && player.isInRange(getBlockGlobalXAtCursor(), getBlockGlobalYAtCursor())) {
             uiManager.toggleCraftingTable();
         }
 
@@ -168,24 +168,46 @@ public class GameScreen implements Screen {
 
         if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
             if (player.isInRange(globalX, globalY) && block.isBreakable()) {
+                float toolLevel = player.getInventory().getSlot(player.selectedSlot) != null ?
+                    player.getInventory().getSlot(player.selectedSlot).getItem().getToolLevel()
+                    : 0;
+                float toolType = player.getInventory().getSlot(player.selectedSlot) != null ?
+                    player.getInventory().getSlot(player.selectedSlot).getItem().getType()
+                    : 0;
+                float perferredTool = block.getPreferredTool();
+                float requiredToolLevel = block.getMinLevel();
+                float minLevel  = block.getMinLevel();
+                float hardness  = block.getHardness();
                 if (!isBreaking || globalX != breakingX || globalY != breakingY) {
                     breakingX = globalX;
                     breakingY = globalY;
-                    breakingTimeTotal = (float)(block.getHardness() * 0.4f);
+
+                    if (toolLevel >= minLevel) {
+                        breakingTimeTotal = hardness / (1.0f + (toolLevel - minLevel) * 1f);
+                    } else {
+                        breakingTimeTotal = hardness * 0.4f;
+                    }
+
                     breakingTimer = 0f;
                     isBreaking = true;
                 } else {
                     breakingTimer += Gdx.graphics.getDeltaTime();
                     if (breakingTimer >= breakingTimeTotal) {
                         world.setBlock(breakingX, breakingY, BlockType.AIR);
-                        DroppedItem drop = new DroppedItem(world,
-                            breakingX, breakingY + 0.25f,
-                            Item.valueOf(block.name()),
-                            MathUtils.random(5f, 8f) * (MathUtils.randomBoolean() ? 1 : -1),
-                            MathUtils.random(2f, 3f),
-                            1
-                        );
-                        world.addEntity(drop);
+                        Item dropping_item = Item.valueOf(block.getDroppingItem());
+                        DroppedItem drop = null;
+                        if (dropping_item != null && block.getMinLevel() == 0
+                            || perferredTool == toolType
+                            && requiredToolLevel <= toolLevel) {
+                            drop = new DroppedItem(world,
+                                breakingX, breakingY + 0.25f,
+                                dropping_item,
+                                MathUtils.random(5f, 8f) * (MathUtils.randomBoolean() ? 1 : -1),
+                                MathUtils.random(2f, 3f),
+                                1
+                            );
+                            world.addEntity(drop);
+                        }
                         isBreaking = false;
                     }
                 }

@@ -43,16 +43,14 @@ public class ItemStack {
         this.amount = amount;
     }
 
-    public ItemStack copy() {
-        return new ItemStack(this.item, this.amount);
-    }
-
     public void drawStack(SpriteBatch batch, float x, float y, float size) {
         float iconSize = size * 0.7f;
         float offset = size * 0.1f;
         batch.draw(getItem().getIcon(), x + offset, y + offset, iconSize, iconSize);
         font.setUseIntegerPositions(false);
         font.getData().setScale(size * 0.025f);
-        font.draw(batch, String.valueOf(getAmount()), x + size*0.5f, y + size*0.25f);
+        if (item.isStackable()) {
+            font.draw(batch, String.valueOf(getAmount()), x + size*0.5f, y + size*0.25f);
+        }
     }
 }

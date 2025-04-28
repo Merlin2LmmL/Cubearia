@@ -6,11 +6,14 @@ import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.g2d.Animation;
-import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
+import com.example.cubearia.game.inventory.Item;
+import com.example.cubearia.game.inventory.ItemID;
+import com.example.cubearia.game.inventory.ItemRegistry;
 import com.example.cubearia.game.world.BlockType;
 
 public class Assets {
     public static TilesetLoader  tileset;
+    public static TilesetLoader  itemsTileset;
     public static Texture        playerTexture;
     public static Texture        slotBackground;
     public static Texture        inventoryBackground;
@@ -24,8 +27,21 @@ public class Assets {
     public static void load() {
         // 1) Lade das Tileset
         tileset = new TilesetLoader("Blocks.tsx");
+        itemsTileset = new TilesetLoader("Items.tsx");
         for (BlockType block : BlockType.values()) {
             block.resolve(tileset);
+        }
+        for (ItemID itemID : ItemID.values()) {
+            TextureRegion icon = Assets.itemsTileset.getRegionById(itemID.getId() - 1);
+            Item item = new Item(
+                itemID.getName(),
+                itemID.getName(),
+                icon,
+                itemID.getMaxStackSize(),
+                itemID.getType(),
+                itemID.getToolLevel()
+            );
+            ItemRegistry.register(item);
         }
 
         // 2) Generiere den Black Pixel

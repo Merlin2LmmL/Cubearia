@@ -146,30 +146,54 @@ public abstract class AbstractContainerUI {
 
     private void placeOrMerge(SlotRegion to, ItemStack slot, boolean onlyOne) {
         if (to.getType() == SlotRegion.Type.OUTPUT) return;
-        if (!onlyOne) {
-            if (slot == null || slot.isEmpty()) {
-                setStack(to, draggedStack); clearOrigin();
-            } else if (slot.getItem().equals(draggedStack.getItem())) {
-                int max = slot.getItem().getMaxStackSize();
-                int total = slot.getAmount() + draggedStack.getAmount();
-                if (total <= max) { slot.setAmount(total); setStack(to, slot); clearOrigin(); }
-                else {
-                    slot.setAmount(max);
-                    draggedStack.setAmount(total - max);
+        if (draggedStack == null || draggedStack.isEmpty()) return;
+
+        // 1) Fall: Ziel-Slot ist leer
+        if (slot == null || slot.isEmpty()) {
+            if (onlyOne) {
+                setStack(to, new ItemStack(draggedStack.getItem(), 1));
+                if (draggedStack.getAmount() > 1) {
+                    draggedStack.decrease(1);
+                } else {
+                    clearOrigin();
+                }
+            } else {
+                setStack(to, draggedStack);
+                clearOrigin();
+            }
+            return;
+        }
+
+        // 2) Fall: Gleiches Item im Slot → Merge-Logik
+        if (slot.getItem().equals(draggedStack.getItem())) {
+            int max = slot.getItem().getMaxStackSize();
+            if (onlyOne) {
+                if (slot.getAmount() < max) {
+                    slot.increase(1);
                     setStack(to, slot);
-                    setStack(originRegion, draggedStack);
-                    originRegion = to;
+                    adjustDraggedAfterPlace();
+                }
+            } else {
+                int space = max - slot.getAmount();
+                if (space >= draggedStack.getAmount()) {
+                    slot.increase(draggedStack.getAmount());
+                    setStack(to, slot);
+                    clearOrigin();
+                } else {
+                    slot.increase(space);
+                    draggedStack.decrease(space);
+                    setStack(to, slot);
                 }
             }
-        } else {
-            if (slot == null || slot.isEmpty()) {
-                setStack(to, new ItemStack(draggedStack.getItem(), 1)); adjustDraggedAfterPlace();
-            } else if (slot.getItem().equals(draggedStack.getItem()) && slot.getAmount() < slot.getItem().getMaxStackSize()) {
-                slot.setAmount(slot.getAmount() + 1);
-                setStack(to, slot);
-                adjustDraggedAfterPlace();
-            }
+            return;
         }
+
+        // 3) Fall: Unterschiedliche Items → Swap
+        ItemStack oldSlot = slot;
+        ItemStack oldDragged = draggedStack;
+        setStack(to, oldDragged);
+        draggedStack = oldSlot;
+        originRegion = to;
     }
 
     private void adjustDraggedAfterPlace() {
@@ -182,17 +206,17 @@ public abstract class AbstractContainerUI {
     // --- Crafting Logic ---
     private void updateCraftingOutput() {
         String[][] grid = getGridSnapshot();
-        String resultKey = recipeRegistry.matchRecipe(grid);
+        ItemStack resultKey = recipeRegistry.matchRecipeWithAutoPadding(grid);
         SlotRegion out = findOutputRegion();
-        if (resultKey != null) setStack(out, new ItemStack(Item.valueOf(resultKey), recipeRegistry.matchRecipeAmount(grid)));
+        if (resultKey != null) setStack(out, resultKey);
         else setStack(out, null);
     }
 
     private void defaultOutputClick() {
         String[][] grid = getGridSnapshot();
-        String key = recipeRegistry.matchRecipe(grid);
+        ItemStack key = recipeRegistry.matchRecipeWithAutoPadding(grid);
         if (key == null) return;
-        ItemStack result = new ItemStack(Item.valueOf(key), recipeRegistry.matchRecipeAmount(grid));
+        ItemStack result = key;
         draggedStack = (draggedStack == null ? result : new ItemStack(result.getItem(), draggedStack.getAmount() + result.getAmount()));
         originRegion = findOutputRegion();
         setStack(originRegion, null);

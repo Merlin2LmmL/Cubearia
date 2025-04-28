@@ -24,6 +24,7 @@ public class UIManager {
 
     private boolean inventoryOpen = false;
     private boolean craftingTableOpen = false;
+    private boolean inMenu = false;
 
     /**
      * Konstruktor initialisiert Rezepte und alle UI-Komponenten.
@@ -94,6 +95,11 @@ public class UIManager {
      * Toggle des Inventar-Bildschirms.
      */
     public void toggleInventory() {
+        if (!inventoryOpen && player.inMenu) {
+            craftingTableOpen = !craftingTableOpen;
+            player.inMenu = false;
+            return;
+        };
         inventoryOpen = !inventoryOpen;
         craftingTableOpen = false;
         player.inMenu = inventoryOpen;

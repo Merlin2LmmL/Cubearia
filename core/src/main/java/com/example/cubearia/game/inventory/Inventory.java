@@ -144,20 +144,6 @@ public class Inventory {
                 craftingInputs[i] = null;
             }
         }
-        // Crafting Output
-        ItemStack stack = craftingOutput;
-        if (stack != null && !stack.isEmpty()) {
-            // Droppe gesamte Menge direkt
-            DroppedItem item = new DroppedItem (
-                world,
-                player.x, player.y,
-                stack.getItem(),
-                0f, 0f,
-                stack.getAmount()
-            );
-            world.addEntity(item);
-            craftingOutput = null;
-        }
     }
 
     public ItemStack getCraftingOutput() {
@@ -168,19 +154,10 @@ public class Inventory {
         craftingOutput = stack;
     }
 
-    public void consumeInput(Item item, int count) {
-        int remaining = count;
-        for (int i = 0; i < craftingInputs.length && remaining > 0; i++) {
-            ItemStack stack = craftingInputs[i];
-            if (stack != null && stack.getItem().equals(item)) {
-                int taken = Math.min(stack.getAmount(), remaining);
-                stack.decrease(taken);
-                remaining -= taken;
-                if (stack.getAmount() <= 0) {
-                    craftingInputs[i] = null;
-                }
-            }
+    public boolean hasSpace() {
+        for (int i=0; i<slots.length; i++) {
+            if (slots[i] == null || slots[i].getAmount() < slots[i].getItem().getMaxStackSize()) return true;
         }
-        // Optional: falls count nicht komplett entnommen, könnte Log oder Exception
+        return false;
     }
 }

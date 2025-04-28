@@ -21,5 +21,5 @@ public class Settings {
     public static final float       UISCALE         = 75/100f;
 
     // OTHER
-    public static final boolean     DEBUG           = true;
+    public static final boolean     DEBUG           = false;
 }

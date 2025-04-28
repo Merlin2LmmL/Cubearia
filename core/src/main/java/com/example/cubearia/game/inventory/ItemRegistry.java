@@ -19,7 +19,7 @@ public class ItemRegistry {
             String id = block.name().toLowerCase(); // z.B. "stone"
             TextureRegion icon = block.getRegion();
 
-            Item item = new Item(id, block.name(), icon, 64, 0); // maxStackSize = 64
+            Item item = new Item(id, block.name(), icon, 64, 0, 0);
             register(item);
         }
     }

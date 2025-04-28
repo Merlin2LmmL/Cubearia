@@ -12,7 +12,7 @@ import com.example.cubearia.game.world.World;
 public class DroppedItem extends Entity {
     private final World world;      // referenz auf die Welt
     private final Item item;
-    private final int quantity;
+    private int quantity;
     private float lifetime = 0f;
     private static final float MAX_LIFETIME = 60f; // nach 60 s verschwindet das Item
     private float velocityX = 0f;
@@ -61,13 +61,14 @@ public class DroppedItem extends Entity {
                 Player p = (Player) e;
                 float dx = (p.x + p.width/2) - (x + width/2);
                 float dy = (p.y + p.height/2) - (y + height/2);
-                if (dx*dx + dy*dy < 1f) {
-                    p.getInventory().addItem(item, quantity);
-                    remove();
+                if (dx*dx + dy*dy < 1.2f && p.getInventory().hasSpace()) {
+                    int leftovers = p.getInventory().addItem(item, quantity);
+                    quantity = leftovers;
                     break;
                 }
             }
         }
+        if (quantity <= 0) remove();
     }
 
     @Override

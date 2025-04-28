@@ -1,49 +1,70 @@
 package com.example.cubearia.game.inventory.crafting;
 
+import com.example.cubearia.game.inventory.ItemStack;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Arrays;
-import java.util.Objects;
 
+/**
+ * Universelle Recipe-Registry, die beliebig große Patterns gegen ein 3×3-Grid matcht.
+ * Leere Slots im Pattern sind genau = null.
+ */
 public class RecipeRegistry {
     private static class InternalRecipe {
-        private final String[][] pattern;
-        private final String resultItem;
-        private final int amount;
-        InternalRecipe(String[][] pattern, String resultItem, int amount) {
+        final String[][] pattern;
+        final ItemStack resultItem;
+
+        InternalRecipe(String[][] pattern, ItemStack resultItem) {
             this.pattern = pattern;
             this.resultItem = resultItem;
-            this.amount = amount;
         }
     }
 
     private final List<InternalRecipe> recipes = new ArrayList<>();
 
-    /**
-     * Registriert ein neues Rezept und loggt es zur Debug-Ausgabe.
-     */
-    public void registerRecipe(String[][] pattern, String resultItem, int amount) {
-        recipes.add(new InternalRecipe(pattern, resultItem, amount));
+    public void registerRecipe(String[][] pattern, ItemStack resultItem) {
+        recipes.add(new InternalRecipe(pattern, resultItem));
     }
 
-    /**
-     * Versucht, ein Rezept für das gegebene Grid zu finden.
-     * Liefert den resultItem-Namen oder null, falls kein Rezept passt.
-     */
-    public String matchRecipe(String[][] inputGrid) {
-        int inRows = inputGrid.length;
-        int inCols = inputGrid[0].length;
+    public ItemStack matchRecipeWithAutoPadding(String[][] inputGrid) {
+        // 1) padde auf 3×3
+        String[][] grid3x3 = padTo3x3(inputGrid);
+        // 2) spiegel vertikal, damit row 0 oben ist
+        grid3x3 = flipVertical(grid3x3);
+        // 3) matche
+        return matchRecipe(grid3x3);
+    }
 
-        for (InternalRecipe r : recipes) {
-            int patRows = r.pattern.length;
-            int patCols = r.pattern[0].length;
-            if (patRows > inRows || patCols > inCols) {
-                continue;
+    private String[][] padTo3x3(String[][] in) {
+        String[][] out = new String[3][3];
+        int r = in.length, c = in[0].length;
+        for (int y = 0; y < r && y < 3; y++) {
+            for (int x = 0; x < c && x < 3; x++) {
+                out[y][x] = in[y][x];
             }
-            for (int yOff = 0; yOff <= inRows - patRows; yOff++) {
-                for (int xOff = 0; xOff <= inCols - patCols; xOff++) {
-                    if (matchesAt(r.pattern, inputGrid, yOff, xOff)) {
-                        return r.resultItem;
+        }
+        return out;
+    }
+
+    private String[][] flipVertical(String[][] in) {
+        int rows = in.length, cols = in[0].length;
+        String[][] out = new String[rows][cols];
+        for (int y = 0; y < rows; y++) {
+            out[y] = in[rows - 1 - y].clone();
+        }
+        return out;
+    }
+
+    private ItemStack matchRecipe(String[][] grid) {
+        int rows = grid.length, cols = grid[0].length;
+        for (InternalRecipe r : recipes) {
+            String[][] pat = r.pattern;
+            int pRows = pat.length, pCols = pat[0].length;
+            if (pRows > rows || pCols > cols) continue;
+            for (int yOff = 0; yOff <= rows - pRows; yOff++) {
+                for (int xOff = 0; xOff <= cols - pCols; xOff++) {
+                    if (matchesAt(pat, grid, yOff, xOff)) {
+                        return new ItemStack(r.resultItem.getItem(), r.resultItem.getAmount());
                     }
                 }
             }
@@ -51,55 +72,24 @@ public class RecipeRegistry {
         return null;
     }
 
-    /**
-     * Prüft, ob das Pattern an gegebener Offset-Position zum Grid passt.
-     */
     private boolean matchesAt(String[][] pattern, String[][] grid, int offY, int offX) {
-        int patRows = pattern.length;
-        int patCols = pattern[0].length;
-        int inRows = grid.length;
-        int inCols = grid[0].length;
-        // 1) Pattern-Bereich prüfen
-        for (int y = 0; y < patRows; y++) {
-            for (int x = 0; x < patCols; x++) {
-                String expected = pattern[y][x];
-                String actual = grid[y + offY][x + offX];
-                if (!Objects.equals(expected, actual)) {
-                    return false;
-                }
-            }
-        }
-        // 2) Außerhalb Pattern muss null sein
-        for (int y = 0; y < inRows; y++) {
-            for (int x = 0; x < inCols; x++) {
-                boolean inZone = y >= offY && y < offY + patRows &&
-                    x >= offX && x < offX + patCols;
-                if (!inZone && grid[y][x] != null) {
-                    return false;
+        int rows = grid.length, cols = grid[0].length;
+        int pRows = pattern.length, pCols = pattern[0].length;
+
+        for (int y = 0; y < rows; y++) {
+            for (int x = 0; x < cols; x++) {
+                int py = y - offY, px = x - offX;
+                boolean inPattern = py >= 0 && py < pRows && px >= 0 && px < pCols;
+                String expected = inPattern ? pattern[py][px] : null;
+                String actual   = grid[y][x];
+
+                if (expected == null) {
+                    if (actual != null) return false;
+                } else {
+                    if (actual == null || !expected.equalsIgnoreCase(actual)) return false;
                 }
             }
         }
         return true;
-    }
-
-    public int matchRecipeAmount(String[][] inputGrid) {
-        int inRows = inputGrid.length;
-        int inCols = inputGrid[0].length;
-
-        for (InternalRecipe r : recipes) {
-            int patRows = r.pattern.length;
-            int patCols = r.pattern[0].length;
-            if (patRows > inRows || patCols > inCols) {
-                continue;
-            }
-            for (int yOff = 0; yOff <= inRows - patRows; yOff++) {
-                for (int xOff = 0; xOff <= inCols - patCols; xOff++) {
-                    if (matchesAt(r.pattern, inputGrid, yOff, xOff)) {
-                        return r.amount;
-                    }
-                }
-            }
-        }
-        return 0;
     }
 }

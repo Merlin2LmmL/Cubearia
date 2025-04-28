@@ -12,6 +12,7 @@ import com.example.cubearia.game.GameScreen;
 import com.example.cubearia.game.Settings;
 import com.example.cubearia.game.inventory.Inventory;
 import com.example.cubearia.game.inventory.Item;
+import com.example.cubearia.game.world.BiomeType;
 import com.example.cubearia.game.world.BlockType;
 import com.example.cubearia.game.world.World;
 
@@ -60,8 +61,6 @@ public class Player extends Entity {
         this.camera = camera;
         this.inventory = inventory;
         inventory.addItem(Item.valueOf("DIRT"), 576);
-        inventory.addItem(Item.valueOf("DIRT"), 576);
-        inventory.addItem(Item.valueOf("LAVA"), 64);
         // Prepare texture regions
         headRegion = new TextureRegion(Assets.playerTexture, 6, 0, 8, 8);
         bodyRegion = new TextureRegion(Assets.playerTexture, 0, 0, 6, 12);
@@ -77,6 +76,7 @@ public class Player extends Entity {
             y = 120;
             x = (float) (Math.random() - 0.5) * 20000;
         }
+
         stateTime += delta;
 
         boolean left  = false;
@@ -180,7 +180,6 @@ public class Player extends Entity {
         }
     }
 
-
     private boolean checkCollision() {
         int startX = (int)Math.floor(x);
         int endX   = (int)Math.ceil(x + width);
@@ -201,7 +200,6 @@ public class Player extends Entity {
     public boolean isInRange(int blockX, int blockY) {
         float dx = blockX - x;
         float dy = blockY - y;
-        // prüft, ob (dx² + dy²) ≤ range²
         return dx*dx + dy*dy <= range*range;
     }
 
@@ -210,7 +208,11 @@ public class Player extends Entity {
     }
 
     public void render(SpriteBatch batch) {
-        float scale = GameScreen.TILE_SIZE / 16;
+        renderAt(batch, x, y, 1);
+    }
+
+    public void renderAt(SpriteBatch batch, float x, float y, int size) {
+        float scale = GameScreen.TILE_SIZE / 16 * size;
         float baseX = x * GameScreen.TILE_SIZE;
         float baseY = y * GameScreen.TILE_SIZE;
 
@@ -249,7 +251,7 @@ public class Player extends Entity {
         // Winkel anpassen, damit die Rotation ≤180° und optisch korrekt bleibt
         float finalAngle;
         if (headFlip) {
-                finalAngle = 180f + angleDeg;
+            finalAngle = 180f + angleDeg;
         } else {
             finalAngle = angleDeg;
         }
