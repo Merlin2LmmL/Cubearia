@@ -2,12 +2,13 @@ package com.example.cubearia.game.inventory.crafting;
 
 import com.example.cubearia.game.inventory.ItemStack;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * Universelle Recipe-Registry, die beliebig große Patterns gegen ein 3×3-Grid matcht.
  * Leere Slots im Pattern sind genau = null.
+ * Jetzt mit Tag-Support: Einträge im Pattern, die einem Tag-Namen entsprechen,
+ * werden gegen alle registrierten Items dieses Tags gematcht.
  */
 public class RecipeRegistry {
     private static class InternalRecipe {
@@ -21,17 +22,31 @@ public class RecipeRegistry {
     }
 
     private final List<InternalRecipe> recipes = new ArrayList<>();
+    // Map für Tag-Namen (z.B. "WOOD") zu einer Menge von Item-IDs
+    private final Map<String, Set<String>> tagMap = new HashMap<>();
+
+    /**
+     * Registriert ein neues Tag mit einer anfänglichen Menge von Item-IDs.
+     */
+    public void registerTag(String tagName, Collection<String> itemIds) {
+        tagMap.put(tagName.toUpperCase(Locale.ROOT), new HashSet<>(itemIds));
+    }
+
+    /**
+     * Fügt einem bestehenden Tag einen weiteren Block/Item hinzu.
+     */
+    public void addItemToTag(String tagName, String itemId) {
+        tagMap.computeIfAbsent(tagName.toUpperCase(Locale.ROOT), k -> new HashSet<>())
+            .add(itemId);
+    }
 
     public void registerRecipe(String[][] pattern, ItemStack resultItem) {
         recipes.add(new InternalRecipe(pattern, resultItem));
     }
 
     public ItemStack matchRecipeWithAutoPadding(String[][] inputGrid) {
-        // 1) padde auf 3×3
         String[][] grid3x3 = padTo3x3(inputGrid);
-        // 2) spiegel vertikal, damit row 0 oben ist
         grid3x3 = flipVertical(grid3x3);
-        // 3) matche
         return matchRecipe(grid3x3);
     }
 
@@ -86,7 +101,19 @@ public class RecipeRegistry {
                 if (expected == null) {
                     if (actual != null) return false;
                 } else {
-                    if (actual == null || !expected.equalsIgnoreCase(actual)) return false;
+                    // Tag-Abgleich: ist expected ein registriertes Tag?
+                    String key = expected.toUpperCase(Locale.ROOT);
+                    if (tagMap.containsKey(key)) {
+                        Set<String> allowed = tagMap.get(key);
+                        if (actual == null || !allowed.contains(actual)) {
+                            return false;
+                        }
+                    } else {
+                        // Normales String-Matching
+                        if (actual == null || !expected.equalsIgnoreCase(actual)) {
+                            return false;
+                        }
+                    }
                 }
             }
         }

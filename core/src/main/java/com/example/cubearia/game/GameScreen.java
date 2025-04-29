@@ -124,7 +124,8 @@ public class GameScreen implements Screen {
             uiManager.toggleInventory();
         }
 
-        if (getBlockAtCursor() == BlockType.CRAFTING_TABLE && Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT) && player.isInRange(getBlockGlobalXAtCursor(), getBlockGlobalYAtCursor())) {
+        if (getBlockAtCursor() == BlockType.CRAFTING_TABLE && Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT) && player.isInRange(getBlockGlobalXAtCursor(), getBlockGlobalYAtCursor())
+        && !player.inMenu) {
             uiManager.toggleCraftingTable();
         }
 
@@ -175,17 +176,17 @@ public class GameScreen implements Screen {
                     player.getInventory().getSlot(player.selectedSlot).getItem().getType()
                     : 0;
                 float perferredTool = block.getPreferredTool();
-                float requiredToolLevel = block.getMinLevel();
                 float minLevel  = block.getMinLevel();
+                float requiredToolType  = block.getPreferredTool();
                 float hardness  = block.getHardness();
                 if (!isBreaking || globalX != breakingX || globalY != breakingY) {
                     breakingX = globalX;
                     breakingY = globalY;
 
-                    if (toolLevel >= minLevel) {
-                        breakingTimeTotal = hardness / (1.0f + (toolLevel - minLevel) * 1f);
+                    if (toolLevel >= minLevel && toolType == requiredToolType) {
+                        breakingTimeTotal = hardness / (2f + (toolLevel - minLevel) * 5f);
                     } else {
-                        breakingTimeTotal = hardness * 0.4f;
+                        breakingTimeTotal = hardness * 0.5f;
                     }
 
                     breakingTimer = 0f;
@@ -198,7 +199,7 @@ public class GameScreen implements Screen {
                         DroppedItem drop = null;
                         if (dropping_item != null && block.getMinLevel() == 0
                             || perferredTool == toolType
-                            && requiredToolLevel <= toolLevel) {
+                            && minLevel <= toolLevel) {
                             drop = new DroppedItem(world,
                                 breakingX, breakingY + 0.25f,
                                 dropping_item,

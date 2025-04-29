@@ -14,9 +14,6 @@ import com.example.cubearia.game.inventory.ItemStack;
 import com.example.cubearia.game.inventory.crafting.RecipeRegistry;
 import java.util.List;
 
-/**
- * Abstrakte Basisklasse für alle Drag-&-Drop-Container mit optionalem Crafting.
- */
 public abstract class AbstractContainerUI {
     private final Texture background;
     private final UILayout layout;
@@ -63,10 +60,9 @@ public abstract class AbstractContainerUI {
     }
 
     public void handleTouchUp(int screenX, int screenY, OrthographicCamera cam) {
-        // Optional override
+        // Optional
     }
 
-    // --- Background & Layout ---
     private void drawBackground(SpriteBatch batch, OrthographicCamera cam) {
         float[] b = computeBackground(cam.viewportWidth, cam.viewportHeight);
         batch.draw(background, b[0], b[1], b[2], b[3]);
@@ -90,7 +86,6 @@ public abstract class AbstractContainerUI {
         return new float[]{(vw - w) / 2f, (vh - h) / 2f, w, h};
     }
 
-    // --- Drawing Items ---
     private void drawStacks(SpriteBatch batch) {
         for (SlotRegion r : regions) {
             ItemStack s = getStack(r);
@@ -108,7 +103,6 @@ public abstract class AbstractContainerUI {
         }
     }
 
-    // --- Debug ---
     private void debugRender(SpriteBatch batch, OrthographicCamera cam) {
         batch.end();
         shapeRenderer.setProjectionMatrix(cam.combined);
@@ -147,8 +141,8 @@ public abstract class AbstractContainerUI {
     private void placeOrMerge(SlotRegion to, ItemStack slot, boolean onlyOne) {
         if (to.getType() == SlotRegion.Type.OUTPUT) return;
         if (draggedStack == null || draggedStack.isEmpty()) return;
+        if (to.getType() == SlotRegion.Type.ARMOR && draggedStack.getItem().getType() != 8) return;
 
-        // 1) Fall: Ziel-Slot ist leer
         if (slot == null || slot.isEmpty()) {
             if (onlyOne) {
                 setStack(to, new ItemStack(draggedStack.getItem(), 1));
@@ -164,7 +158,6 @@ public abstract class AbstractContainerUI {
             return;
         }
 
-        // 2) Fall: Gleiches Item im Slot → Merge-Logik
         if (slot.getItem().equals(draggedStack.getItem())) {
             int max = slot.getItem().getMaxStackSize();
             if (onlyOne) {
@@ -188,7 +181,6 @@ public abstract class AbstractContainerUI {
             return;
         }
 
-        // 3) Fall: Unterschiedliche Items → Swap
         ItemStack oldSlot = slot;
         ItemStack oldDragged = draggedStack;
         setStack(to, oldDragged);
@@ -203,7 +195,6 @@ public abstract class AbstractContainerUI {
 
     private void clearOrigin() { draggedStack = null; originRegion = null; }
 
-    // --- Crafting Logic ---
     private void updateCraftingOutput() {
         String[][] grid = getGridSnapshot();
         ItemStack resultKey = recipeRegistry.matchRecipeWithAutoPadding(grid);
@@ -214,22 +205,46 @@ public abstract class AbstractContainerUI {
 
     private void defaultOutputClick() {
         String[][] grid = getGridSnapshot();
-        ItemStack key = recipeRegistry.matchRecipeWithAutoPadding(grid);
-        if (key == null) return;
-        ItemStack result = key;
-        draggedStack = (draggedStack == null ? result : new ItemStack(result.getItem(), draggedStack.getAmount() + result.getAmount()));
+        ItemStack result = recipeRegistry.matchRecipeWithAutoPadding(grid);
+        if (result == null) return;
+
+        Item item = result.getItem();
+        int resultAmt = result.getAmount();
+        int maxStack = item.getMaxStackSize();
+
+        if (draggedStack == null) {
+            draggedStack = new ItemStack(item, resultAmt);
+
+        } else if (draggedStack.getItem() == item) {
+            int currentAmt = draggedStack.getAmount();
+            if (currentAmt + resultAmt <= maxStack) {
+                draggedStack = new ItemStack(item, currentAmt + resultAmt);
+            } else {
+                return;
+            }
+
+        } else {
+            return;
+        }
+
         originRegion = findOutputRegion();
         setStack(originRegion, null);
+
         for (SlotRegion r : regions) {
-            if (r.getType() == SlotRegion.Type.CRAFTING2x2 || r.getType() == SlotRegion.Type.CRAFTING3x3) {
+            if (r.getType() == SlotRegion.Type.CRAFTING2x2
+                || r.getType() == SlotRegion.Type.CRAFTING3x3) {
                 ItemStack s = getStack(r);
                 if (s != null) {
-                    if (s.getAmount() <= 1) setStack(r, null);
-                    else setStack(r, new ItemStack(s.getItem(), s.getAmount() - 1));
+                    if (s.getAmount() <= 1) {
+                        setStack(r, null);
+                    } else {
+                        setStack(r, new ItemStack(s.getItem(), s.getAmount() - 1));
+                    }
                 }
             }
         }
     }
+
 
     private SlotRegion findOutputRegion() {
         return regions.stream().filter(r -> r.getType() == SlotRegion.Type.OUTPUT).findFirst().orElse(null);

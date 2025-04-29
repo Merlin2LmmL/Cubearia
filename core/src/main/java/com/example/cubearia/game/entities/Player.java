@@ -9,10 +9,8 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
 import com.example.cubearia.game.Assets;
 import com.example.cubearia.game.GameScreen;
-import com.example.cubearia.game.Settings;
 import com.example.cubearia.game.inventory.Inventory;
 import com.example.cubearia.game.inventory.Item;
-import com.example.cubearia.game.world.BiomeType;
 import com.example.cubearia.game.world.BlockType;
 import com.example.cubearia.game.world.World;
 
@@ -60,7 +58,9 @@ public class Player extends Entity {
         this.world = world;
         this.camera = camera;
         this.inventory = inventory;
-        inventory.addItem(Item.valueOf("DIRT"), 576);
+        inventory.addItem(Item.valueOf("DIRT"), 64);
+        inventory.addItem(Item.valueOf("OAK_LOG"), 64);
+        inventory.addItem(Item.valueOf("COBBLESTONE"), 64);
         // Prepare texture regions
         headRegion = new TextureRegion(Assets.playerTexture, 6, 0, 8, 8);
         bodyRegion = new TextureRegion(Assets.playerTexture, 0, 0, 6, 12);
