@@ -97,7 +97,7 @@ public class GameScreen implements Screen {
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override
             public boolean scrolled(float amountX, float amountY) {
-                camera.zoom = MathUtils.clamp(camera.zoom + amountY * 0.1f, 0.2f, 3f);
+                camera.zoom = MathUtils.clamp(camera.zoom + amountY * 0.1f, 0.2f, 80f);
                 return true;
             }
 
@@ -119,6 +119,9 @@ public class GameScreen implements Screen {
                 return true;
             }
         });
+
+        Settings.RENDERDISTANCE = (int) (camera.zoom * 1.5f + 1f);
+        System.out.println(Settings.RENDERDISTANCE);
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
             uiManager.toggleInventory();
@@ -193,7 +196,7 @@ public class GameScreen implements Screen {
                     isBreaking = true;
                 } else {
                     breakingTimer += Gdx.graphics.getDeltaTime();
-                    if (breakingTimer >= breakingTimeTotal) {
+                    if (breakingTimer >= breakingTimeTotal || Settings.CREATIVE_MODE) {
                         world.setBlock(breakingX, breakingY, BlockType.AIR);
                         Item dropping_item = Item.valueOf(block.getDroppingItem());
                         DroppedItem drop = null;
@@ -258,7 +261,7 @@ public class GameScreen implements Screen {
         batch.begin();
 
         final int COLUMNS = 4;
-        Renderer.renderWorld(world, player, batch);
+        new Renderer().renderWorld(world, player, batch, camera);
 
         if (isBreaking) {
             float progress = breakingTimer / breakingTimeTotal;

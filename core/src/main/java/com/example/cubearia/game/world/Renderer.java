@@ -1,157 +1,139 @@
 package com.example.cubearia.game.world;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.utils.IntMap;
+import com.badlogic.gdx.utils.IntSet;
+import com.badlogic.gdx.utils.IntArray;
 import com.example.cubearia.game.Assets;
 import com.example.cubearia.game.Settings;
 import com.example.cubearia.game.entities.Player;
 
-import java.awt.Point;
-import java.util.*;
-
 import static com.example.cubearia.game.GameScreen.TILE_SIZE;
 
+/**
+ * Renderer mit weiter optimiertem Culling und ohne Objekterzeugung pro Block.
+ */
 public class Renderer {
     private static final int[] DX = {1, -1, 0, 0};
     private static final int[] DY = {0, 0, 1, -1};
+    private static int renderRadius;
 
-    // Erweitertes Sichtfeld um einen Chunk nach hinten
-    private static final int BACK_EXTRA = 1;
-    private static final int RADIUS_IN_CHUNKS = Settings.RENDERDISTANCE + BACK_EXTRA;
+    public void renderWorld(World world, Player player, SpriteBatch batch, OrthographicCamera camera) {
+        renderRadius = Settings.RENDERDISTANCE;
 
-    public static void renderWorld(World world, Player player, SpriteBatch batch) {
-        Set<Point> visibleAir = new HashSet<>();
-        if (!Settings.RENDERALLBLOCKS) {
-            visibleAir = computeVisibleAir(world, player.x, player.y);
-        }
+        // Sichtbare Luftpunkte (primitive Keys)
+        IntSet visibleAir = Settings.RENDERALLBLOCKS ? null : computeVisibleAir(world, player.x, player.y);
 
-        int playerChunk = Math.floorDiv(Math.round(player.x), Chunk.WIDTH);
-        int minChunk = playerChunk - Settings.RENDERDISTANCE - BACK_EXTRA;
-        int maxChunk = playerChunk + Settings.RENDERDISTANCE + BACK_EXTRA;
+        // Kamera-Bounds in Tile-Koordinaten
+        float camX = camera.position.x;
+        float camY = camera.position.y;
+        float viewW = camera.viewportWidth * camera.zoom;
+        float viewH = camera.viewportHeight * camera.zoom;
+        int minXtile = (int)((camX - viewW/2f) / TILE_SIZE);
+        int maxXtile = (int)((camX + viewW/2f) / TILE_SIZE);
+        int minYtile = Math.max(0, (int)((camY - viewH/2f) / TILE_SIZE));
+        int maxYtile = Math.min(Chunk.HEIGHT - 1, (int)((camY + viewH/2f) / TILE_SIZE));
 
-        for (Map.Entry<Integer, Chunk> entry : world.getChunks().entrySet()) {
-            int chunkX = entry.getKey();
-            Chunk chunk = entry.getValue();
+        // Chunk-Bereich horizontal
+        int cCenter = Math.floorDiv(Math.round(player.x), Chunk.WIDTH);
+        int cMin = cCenter - Settings.RENDERDISTANCE;
+        int cMax = cCenter + Settings.RENDERDISTANCE;
 
-            if (chunkX >= minChunk && chunkX <= maxChunk) {
-                for (int lx = 0; lx < Chunk.WIDTH; lx++) {
-                    for (int y = 0; y < Chunk.HEIGHT; y++) {
-                        int gx = chunkX * Chunk.WIDTH + lx;
-                        int gy = y;
-                        Point p = new Point(gx, gy);
-                        BlockType type = chunk.blocks[lx][y];
-                        boolean isAir = type == BlockType.AIR;
+        // Renderschleife mit beidseitigem Culling
+        for (IntMap.Entry<Chunk> entry : world.getChunks().entries()) {
+            int cx = entry.key;
+            if (cx < cMin || cx > cMax) continue;
+            Chunk chunk = entry.value;
+            int baseX = cx * Chunk.WIDTH;
 
-                        boolean isVisible = Settings.RENDERALLBLOCKS || visibleAir.contains(p)
-                            || (!isAir && hasAdjacentVisibleAir(p, visibleAir));
+            // Lokaler X-Bereich pro Chunk
+            int startLx = Math.max(0, minXtile - baseX - 1); // zusätzlich eine Spalte links rendern
+            int endLx   = Math.min(Chunk.WIDTH - 1, maxXtile - baseX);
+            if (startLx > endLx) continue;
 
-                        float dstX = gx * TILE_SIZE;
-                        float dstY = gy * TILE_SIZE;
+            for (int lx = startLx; lx <= endLx; lx++) {
+                int gx = baseX + lx;
+                for (int y = minYtile; y <= maxYtile; y++) {
+                    int key = (gx << 16) | y;
+                    BlockType type = chunk.blocks[lx][y][1];
+                    boolean air = (type == BlockType.AIR);
+                    boolean vis = Settings.RENDERALLBLOCKS
+                        || (visibleAir != null && visibleAir.contains(key))
+                        || (!air && hasAdjacent(visibleAir, key));
 
-                        // Luftblöcke überspringen, die sichtbar sind
-                        if (isAir && visibleAir.contains(p)) {
-                            continue;
-                        }
-
-                        if (!isAir && isVisible) {
-                            TextureRegion region = type.getRegion();
-                            if (region != null) {
-                                batch.draw(region, dstX, dstY, TILE_SIZE, TILE_SIZE);
-                            }
-                        } else if (!Settings.RENDERALLBLOCKS) {
-                            batch.draw(Assets.blackPixel, dstX, dstY, TILE_SIZE, TILE_SIZE);
-                        }
+                    if (air && visibleAir != null && visibleAir.contains(key)) continue;
+                    float dstX = gx * TILE_SIZE;
+                    float dstY = y * TILE_SIZE;
+                    if (!air && vis) {
+                        TextureRegion r = type.getRegion();
+                        if (r != null) batch.draw(r, dstX, dstY, TILE_SIZE, TILE_SIZE);
+                    } else if (!Settings.RENDERALLBLOCKS) {
+                        batch.draw(Assets.blackPixel, dstX, dstY, TILE_SIZE, TILE_SIZE);
                     }
                 }
             }
         }
 
+        // Debug-Grid (unverändert)
         if (Settings.DEBUG) {
-            int minBoundary = playerChunk - Settings.RENDERDISTANCE + 1 - BACK_EXTRA;
-            int maxBoundary = playerChunk + Settings.RENDERDISTANCE + 1 + BACK_EXTRA;
-            float worldHeightPixels = Chunk.HEIGHT * TILE_SIZE;
-
             batch.setColor(Color.GREEN);
-            for (int boundary = minBoundary; boundary <= maxBoundary; boundary++) {
-                float lineX = boundary * Chunk.WIDTH * TILE_SIZE;
-                batch.draw(Assets.whitePixel, lineX, 0, 1, worldHeightPixels);
+            float worldHpix = Chunk.HEIGHT * TILE_SIZE;
+            int minBoundary = cMin + 1;
+            int maxBoundary = cMax + 1;
+            for (int b = minBoundary; b <= maxBoundary; b++) {
+                float x = b * Chunk.WIDTH * TILE_SIZE;
+                batch.draw(Assets.whitePixel, x, 0, 1, worldHpix);
             }
             batch.setColor(Color.WHITE);
         }
     }
 
-    private static Set<Point> computeVisibleAir(World world, float playerX, float playerY) {
-        Set<Point> visited = new HashSet<>();
-        Deque<Point> queue = new ArrayDeque<>();
-        int maxIterations = 100_000;
-        int iterationCount = 0;
-
-        int startX = (int) playerX;
-        int startY = (int) playerY;
-
-        int minX = ((startX / Chunk.WIDTH) - RADIUS_IN_CHUNKS) * Chunk.WIDTH;
-        int maxX = ((startX / Chunk.WIDTH) + RADIUS_IN_CHUNKS + 1) * Chunk.WIDTH - 1;
-        int minY = 0;
-        int maxY = Chunk.HEIGHT - 1;
-
-        Point start = new Point(startX, startY);
-        BlockType startBlock = getBlockSafe(world, startX, startY);
-
-        if (startBlock == null || !startBlock.isTransparent()) {
-            boolean found = false;
+    // computeVisibleAir unverändert
+    private static IntSet computeVisibleAir(World world, float px, float py) {
+        IntSet vis = new IntSet();
+        IntArray queue = new IntArray();
+        int startX = (int) px, startY = (int) py;
+        int minX = ((startX / Chunk.WIDTH) - renderRadius) * Chunk.WIDTH;
+        int maxX = ((startX / Chunk.WIDTH) + renderRadius + 1) * Chunk.WIDTH - 1;
+        int startKey = (startX << 16) | startY;
+        vis.add(startKey);
+        queue.add(startKey);
+        int idx = 0;
+        while (idx < queue.size && idx < 100_000) {
+            int k = queue.get(idx++);
+            int x = k >> 16, y = k & 0xFFFF; // use arithmetic shift for negative coords
             for (int i = 0; i < 4; i++) {
-                int nx = startX + DX[i];
-                int ny = startY + DY[i];
-                BlockType neighbor = getBlockSafe(world, nx, ny);
-                if (neighbor != null && neighbor.isTransparent()) {
-                    startX = nx;
-                    startY = ny;
-                    start = new Point(startX, startY);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) return visited;
-        }
-
-        visited.add(start);
-        queue.add(start);
-
-        while (!queue.isEmpty() && iterationCount++ < maxIterations) {
-            Point current = queue.poll();
-
-            for (int i = 0; i < 4; i++) {
-                int nx = current.x + DX[i];
-                int ny = current.y + DY[i];
-
-                if (nx < minX || nx > maxX || ny < minY || ny > maxY) continue;
-
-                Point neighbor = new Point(nx, ny);
-                BlockType block = getBlockSafe(world, nx, ny);
-                if (block != null && block.isTransparent() && !visited.contains(neighbor)) {
-                    visited.add(neighbor);
-                    queue.add(neighbor);
+                int nx = x + DX[i], ny = y + DY[i];
+                if (nx < minX || nx > maxX || ny < 0 || ny >= Chunk.HEIGHT) continue;
+                int nk = (nx << 16) | ny;
+                if (vis.contains(nk)) continue;
+                BlockType b = getBlockSafe(world, nx, ny);
+                if (b != null && b.isTransparent()) {
+                    vis.add(nk);
+                    queue.add(nk);
                 }
             }
         }
-
-        return visited;
+        return vis;
     }
 
-    private static boolean hasAdjacentVisibleAir(Point cell, Set<Point> visible) {
-        for (int i = 0; i < DX.length; i++) {
-            Point np = new Point(cell.x + DX[i], cell.y + DY[i]);
-            if (visible.contains(np)) return true;
+    private static boolean hasAdjacent(IntSet vis, int key) {
+        if (vis == null) return false;
+        int x = key >> 16, y = key & 0xFFFF; // arithmetic shift for negatives
+        for (int i = 0; i < 4; i++) {
+            int nk = ((x + DX[i]) << 16) | (y + DY[i]);
+            if (vis.contains(nk)) return true;
         }
         return false;
     }
 
-    private static BlockType getBlockSafe(World world, int gx, int gy) {
-        int chunkX = Math.floorDiv(gx, Chunk.WIDTH);
-        Chunk chunk = world.getChunks().get(chunkX);
-        if (chunk == null || gy < 0 || gy >= Chunk.HEIGHT) return null;
-        int lx = Math.floorMod(gx, Chunk.WIDTH);
-        return chunk.blocks[lx][gy];
+    private static BlockType getBlockSafe(World w, int gx, int gy) {
+        int cx = Math.floorDiv(gx, Chunk.WIDTH);
+        Chunk c = w.getChunks().get(cx);
+        if (c == null || gy < 0 || gy >= Chunk.HEIGHT) return null;
+        return c.blocks[Math.floorMod(gx, Chunk.WIDTH)][gy][1];
     }
 }
