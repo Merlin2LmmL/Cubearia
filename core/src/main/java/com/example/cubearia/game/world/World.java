@@ -1,22 +1,30 @@
 package com.example.cubearia.game.world;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.maps.tiled.TiledMap;
 import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
 import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.utils.IntMap;
 import com.badlogic.gdx.utils.IntArray;
+import com.badlogic.gdx.utils.TimeUtils;
 import com.example.cubearia.game.Settings;
 import com.example.cubearia.game.entities.Entity;
+import com.example.cubearia.game.entities.FallingBlock;
+import com.example.cubearia.game.entities.Player;
+import com.example.cubearia.game.entities.particle.Particle;
+
 import java.util.*;
 
 /**
- * Die Welt verwaltet Chunks, Entities und Strukturen mit optimierter Performance.
+ * Die Welt verwaltet Chunks, Entities, Strukturen und Blockupdates mit optimierter Performance.
  */
 public class World {
     // IntMap vermeidet Integer-Boxing und ist performanter als HashMap
     private final IntMap<Chunk> chunks = new IntMap<>();
     private final List<Entity> entities = new ArrayList<>();
+    private final List<Particle> particles = new ArrayList<>();
 
     // Strukturverwaltung
     private final List<PendingStructure> pendingStructures = new ArrayList<>();
@@ -24,6 +32,12 @@ public class World {
     private boolean loadingStructure = false;
 
     private final NoiseBasedBiomeGenerator biomeGenerator = new NoiseBasedBiomeGenerator();
+
+    // Blockupdate-Verwaltung
+    private long currentTick = 0;
+    private final List<ScheduledBlockUpdate> scheduledBlockUpdates = new ArrayList<>();
+    private final List<ScheduledBlockUpdate> newlyScheduledUpdates = new ArrayList<>();
+
 
     /**
      * Gibt den Blocktyp an globalen Koordinaten zurück.
@@ -36,7 +50,7 @@ public class World {
     }
 
     /**
-     * Setzt einen Block ohne weitere Logik.
+     * Setzt einen Block ohne weitere Logik (direkt im Chunk).
      */
     public void setBlock(int globalX, int y, BlockType type) {
         int chunkX = Math.floorDiv(globalX, Chunk.WIDTH);
@@ -46,7 +60,7 @@ public class World {
     }
 
     /**
-     * Update der Welt: Entities updaten und entfernen.
+     * Update der Welt: Entities updaten, Partikel updaten und geplante Blockupdates ausführen.
      */
     public void update(float delta) {
         Iterator<Entity> it = entities.iterator();
@@ -54,6 +68,23 @@ public class World {
             Entity e = it.next();
             e.update(delta);
             if (e.isRemoved()) it.remove();
+        }
+        updateParticles(delta);
+        processScheduledBlockUpdates();
+        currentTick++;
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+            Player player = null;
+            for (Entity e : entities) {
+                if (e instanceof Player) {
+                    player = (Player) e;
+                    break;
+                }
+            }
+
+                FallingBlock fallin = new FallingBlock(this, player.getX(), player.getY() + 10, BlockType.DIRT, 0, 0);
+                this.addEntity(fallin);
+                return;
         }
     }
 
@@ -191,6 +222,94 @@ public class World {
             this.file = f;
             this.globalX = gx;
             this.globalY = gy;
+        }
+    }
+
+    /**
+     * Plant ein Block‐Update, das in 'delaySeconds' Sekunden ausgeführt werden soll.
+     * Beispiel: scheduleBlockUpdate(globalX, y, 2.5f) → nach 2,5 Sekunden wird
+     * in processScheduledBlockUpdates(...) das Update ausgelöst.
+     */
+    public void scheduleBlockUpdate(int globalX, int y, float delaySeconds, boolean surrounding) {
+        long executeAtMillis = TimeUtils.millis() + (long)(delaySeconds * 1000);
+        newlyScheduledUpdates.add(new ScheduledBlockUpdate(globalX, y, executeAtMillis, surrounding));
+    }
+
+    /**
+     * Ein BlockUpdate ohne Verzögerung (= sofort in der nächsten Verarbeitungsschleife).
+     */
+    public void blockUpdate(int globalX, int y, boolean surrounding) {
+        scheduleBlockUpdate(globalX, y, 0f, surrounding);
+    }
+
+    /**
+     * Diese Methode wird regelmäßig (z.B. pro Frame/Tick) aufgerufen.
+     * Sie durchläuft alle geplanten Updates und führt jedes aus, dessen
+     * executeAtMillis ≤ aktueller Systemzeit ist.
+     */
+    private void processScheduledBlockUpdates() {
+        long nowMillis = TimeUtils.millis();
+
+        // Erst alle aktuellen Updates verarbeiten
+        Iterator<ScheduledBlockUpdate> it = scheduledBlockUpdates.iterator();
+        while (it.hasNext()) {
+            ScheduledBlockUpdate s = it.next();
+            if (nowMillis >= s.executeAtMillis) {
+                int chunkX = Math.floorDiv(s.globalX, Chunk.WIDTH);
+                int localX = Math.floorMod(s.globalX, Chunk.WIDTH);
+
+                Chunk target = getOrCreateChunk(chunkX);
+                int[][] dirs = s.surrounding
+                    ? new int[][]{{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+                    : new int[][]{{0, 0}};
+                target.updateNeighbors(localX, s.y, dirs);
+
+                it.remove();
+            }
+        }
+
+        // Danach neue Updates hinzufügen (damit sie **nicht** im selben Frame verarbeitet werden)
+        scheduledBlockUpdates.addAll(newlyScheduledUpdates);
+        newlyScheduledUpdates.clear();
+    }
+
+    /**
+     * Innere Klasse repräsentiert ein geplantes Update.
+     * 'executeAtMillis' ist der absolute Zeitpunkt (System‐Millis), an dem
+     * das Update ausgelöst werden soll.
+     */
+    private static class ScheduledBlockUpdate {
+        final int globalX;
+        final int y;
+        final long executeAtMillis;
+        final boolean surrounding;
+
+        ScheduledBlockUpdate(int globalX, int y, long executeAtMillis, boolean surrounding) {
+            this.globalX = globalX;
+            this.y = y;
+            this.executeAtMillis = executeAtMillis;
+            this.surrounding = surrounding;
+        }
+    }
+
+    public void spawnParticle(Particle p) {
+        particles.add(p);
+    }
+
+    public void updateParticles(float delta) {
+        for (int i = 0; i < particles.size(); i++) {
+            Particle p = particles.get(i);
+            p.update(delta);
+            if (p.isDead()) {
+                particles.remove(i);
+                i--;
+            }
+        }
+    }
+
+    public void renderParticles(SpriteBatch batch) {
+        for (Particle p : particles) {
+            p.render(batch);
         }
     }
 }

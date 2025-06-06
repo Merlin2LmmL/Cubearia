@@ -12,7 +12,7 @@ public class ItemRegistry {
     public static void init() {
         for (BlockType block : BlockType.values()) {
             // Blöcke überspringen, die nicht im Inventar erscheinen sollen
-            if (block == BlockType.AIR || block == BlockType.WATER || block.getRegion() == null) {
+            if (block == BlockType.AIR || block.getRegion() == null) {
                 continue;
             }
 

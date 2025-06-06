@@ -39,13 +39,9 @@ public class DebugRenderer {
         // Berechnung der UI-Position relativ zur UI-Kamera (wir nutzen die Skalierung hier)
         float x = uiPosition.x;
         float y = uiPosition.y;
-
-        // Sicherstellen, dass die UI-Position auch bei Resize immer korrekt bleibt:
-        // Die Berechnungen berücksichtigen jetzt die Skalierung der UI-Kamera
-
         // Player-Position
         font.draw(batch,
-            String.format("Player:  (X=%.2f, Y=%.2f, velX=%.2f, velY=%.2f", player.x, player.y, player.velocityX, player.velocityY),
+            String.format("Player:  (X=%.2f, Y=%.2f, velX=%.2f, velY=%.2f", player.x, player.y, player.getVelocityX(), player.getVelocityY()),
             x, y
         );
 

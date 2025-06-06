@@ -15,6 +15,7 @@ public class Assets {
     public static TilesetLoader  tileset;
     public static TilesetLoader  itemsTileset;
     public static Texture        playerTexture;
+    public static Texture        sheepTexture;
     public static Texture        slotBackground;
     public static Texture        inventoryBackground;
     public static Texture        craftingTableBackground;
@@ -58,7 +59,8 @@ public class Assets {
         pix2.dispose();
 
         // 3) Lade andere Assets
-        playerTexture = new Texture(Gdx.files.internal("Player.png"));
+        playerTexture = new Texture(Gdx.files.internal("entities/player.png"));
+        sheepTexture = new Texture(Gdx.files.internal("entities/sheep.png"));
         slotBackground = new Texture(Gdx.files.internal("ui/SlotBackground.png"));
         inventoryBackground = new Texture(Gdx.files.internal("ui/InventoryBackground.png"));
         craftingTableBackground = new Texture(Gdx.files.internal("ui/CraftingTableBackground.png"));

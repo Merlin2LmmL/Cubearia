@@ -1,6 +1,8 @@
 package com.example.cubearia.game.world;
 
 import com.example.cubearia.game.Settings;
+import com.example.cubearia.game.entities.FallingBlock;
+
 import java.util.*;
 
 /**
@@ -30,6 +32,85 @@ public class Chunk {
         carveMegaCaverns(5, 30, 100, 0.3, 2);
         carveCaves();
         removeSmallCavesPredictive(100);
+    }
+
+    public void updateNeighbors(int x, int y, int[][] dirs) {
+        for (int[] d : dirs) {
+            int nx = x + d[0];
+            int ny = y + d[1];
+            int globalX = chunkX * WIDTH + nx;
+
+            int chunkXTarget = Math.floorDiv(globalX, WIDTH);
+            int localX = Math.floorMod(globalX, WIDTH);
+
+            for (int layer = 0; layer < LAYERS; layer++) {
+                world.getOrCreateChunk(chunkXTarget).updateBlock(localX, ny, layer);
+            }
+        }
+    }
+
+    public void updateBlock(int x, int y, int layer) {
+        // Falls Y außerhalb liegt, nichts tun
+        if (y < 0 || y >= Chunk.HEIGHT) return;
+
+        // Berechne globale X‑Koordinate dieses Blocks
+        int globalX = chunkX * Chunk.WIDTH + x;
+
+        // Aktuellen Blocktyp über World.getBlock abfragen
+        BlockType current = world.getBlock(globalX, y);
+
+        // --- 1) Wasser‑Logik --------------------------------------------------
+
+        if (current == BlockType.WATER) {
+            // 1a) Versuch: Wasser nach unten fließen lassen
+            int belowY = y - 1;
+            BlockType below = world.getBlock(globalX, belowY);
+
+            if (belowY >= 0 && (below == BlockType.AIR || below == BlockType.WATER)) {
+                // Setze Wasser eine Y‑Stufe tiefer
+                world.setBlock(globalX, belowY, BlockType.WATER);
+                // Update für den neuen Wasserblock anstoßen
+                world.scheduleBlockUpdate(globalX, belowY, 1, false);
+            } else {
+                // 1b) Sonst: Wasser nach links/rechts ausbreiten
+                int[][] sideDirs = { { -1, 0 }, { +1, 0 } };
+                for (int[] d : sideDirs) {
+                    int nxGlobal = globalX + d[0];
+                    int ny = y; // gleiche Y‑Stufe
+
+                    // Nur dann setzen, wenn darunter kein Stein existiert und aktueller Block Luft ist
+                    BlockType target = world.getBlock(nxGlobal, ny);
+                    if (target == BlockType.AIR) {
+                        world.setBlock(nxGlobal, ny, BlockType.WATER);
+                        world.scheduleBlockUpdate(nxGlobal, ny, 1, false);
+                    }
+                }
+            }
+        }
+
+        // --- 2) Schwerkraft‑Logik (Beispiel: Sand) -----------------------------
+
+        if (current == BlockType.SAND) {
+            int belowY = y - 1;
+            BlockType below = world.getBlock(globalX, belowY);
+
+            // Wenn unterhalb Luft ist, Sand fallen lassen
+            if (belowY >= 0 && below == BlockType.AIR) {
+                // Alten Sandblock (im Chunk) auf AIR setzen
+                world.setBlock(globalX, y, BlockType.AIR);
+
+                // Eine neue FallingBlock‑Entität erzeugen (verwendet globale X‑Koordinate)
+                FallingBlock fallingBlock = new FallingBlock(
+                    world,
+                    globalX,
+                    y,
+                    BlockType.SAND,
+                    0, // initialer X‑Geschwindigkeitsanteil
+                    0  // initialer Y‑Geschwindigkeitsanteil
+                );
+                world.addEntity(fallingBlock);
+            }
+        }
     }
 
     /**
@@ -124,8 +205,6 @@ public class Chunk {
         seed = seed * 31 + s.getFilePath().hashCode();
         return seed;
     }
-
-    // ------------ Höhlengeneration ------------
 
     private void carveMegaCaverns(int count, int minR, int maxR, double dev, int iters) {
         int maxAllowed = Math.min(WIDTH, HEIGHT) / 2 - 1;
@@ -263,6 +342,6 @@ public class Chunk {
     }
 
     private void connectRegions(List<int[]> centers) {
-        // stub: kann zur Verbindung von Kavernen genutzt werden
+        // stub: Verbindung von Caves
     }
 }

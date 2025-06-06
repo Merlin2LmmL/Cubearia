@@ -23,5 +23,6 @@ public class Settings {
 
     // OTHER
     public static final boolean     DEBUG           = false;
-    public static final boolean     CREATIVE_MODE   = true;
+    public static final boolean     CREATIVE_MODE   = false;
+    public static final boolean     VSYNC           = false;
 }

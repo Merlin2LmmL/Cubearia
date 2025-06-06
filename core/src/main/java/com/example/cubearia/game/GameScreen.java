@@ -7,17 +7,18 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.example.cubearia.game.entities.Player;
-import com.example.cubearia.game.inventory.*;
-import com.example.cubearia.game.inventory.crafting.DefaultRecipes;
-import com.example.cubearia.game.inventory.crafting.RecipeRegistry;
+import com.example.cubearia.game.entities.DroppedItem;
+import com.example.cubearia.game.entities.Sheep;
+import com.example.cubearia.game.inventory.Inventory;
+import com.example.cubearia.game.inventory.ItemRegistry;
 import com.example.cubearia.game.world.BlockType;
-import com.example.cubearia.game.world.Chunk;
 import com.example.cubearia.game.world.Renderer;
 import com.example.cubearia.game.world.World;
-import com.example.cubearia.ui.*;
+import com.example.cubearia.ui.DebugRenderer;
 import com.example.cubearia.ui.UIManager;
 
-import javax.swing.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class GameScreen implements Screen {
     public static final int TILE_SIZE = 16;
@@ -29,7 +30,8 @@ public class GameScreen implements Screen {
     private DebugRenderer debugRenderer;
 
     private World world;
-    private Player player;
+    private Player localPlayer;
+    private Sheep sheep;
     private Inventory inventory;
     private UIManager uiManager;
 
@@ -37,12 +39,8 @@ public class GameScreen implements Screen {
     private final float DEADZONE_HEIGHT = 2 * TILE_SIZE;
     private final float CAMERA_LERP     = 8;
     private final float MAX_DISTANCE    = 8 * TILE_SIZE;
-    private final float CAMERA_OFFSET_Y = -1 * TILE_SIZE;
-
-    private float breakingTimer = 0f;
-    private float breakingTimeTotal = 0f;
-    private int breakingX = -1, breakingY = -1;
-    private boolean isBreaking = false;
+    private final float CAMERA_OFFSET_Y = 2f * TILE_SIZE;
+    private int max_zoom;
 
     @Override
     public void show() {
@@ -60,16 +58,21 @@ public class GameScreen implements Screen {
 
         world = new World();
         inventory = new Inventory(9, 4);
-        player    = new Player(world, camera, inventory);
-        world.addEntity(player);
-        uiManager = new UIManager(player, uiCamera, world, inventory);
+        localPlayer = new Player(world, camera, inventory);
+        world.addEntity(localPlayer);
+        sheep = new Sheep(world, camera);
+        world.addEntity(sheep);
+        uiManager = new UIManager(localPlayer, uiCamera, world, inventory);
+        max_zoom = Settings.DEBUG ? 80 : 10;
     }
 
     private void update(float delta) {
+        // 1) Welt aktualisieren (bewegt z.B. fallende DroppedItems, Spieler‐Bewegung, etc.)
         world.update(delta);
-        float targetX = player.x * TILE_SIZE;
-        float targetY = player.y * TILE_SIZE;
 
+        // 2) Kamera nur auf den lokalen Spieler ausrichten
+        float targetX = localPlayer.getX() * TILE_SIZE;
+        float targetY = localPlayer.getY() * TILE_SIZE;
         Vector3 camPos = camera.position;
         float dx = targetX - camPos.x;
         float dy = targetY - camPos.y + CAMERA_OFFSET_Y * camera.zoom;
@@ -94,25 +97,26 @@ public class GameScreen implements Screen {
             camPos.y = targetY + (float)Math.sin(angle) * MAX_DISTANCE;
         }
 
+        // 3) Input‐Processor für Zoom & UI
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override
             public boolean scrolled(float amountX, float amountY) {
-                camera.zoom = MathUtils.clamp(camera.zoom + amountY * 0.1f, 0.2f, 80f);
+                camera.zoom = MathUtils.clamp(
+                    camera.zoom + amountY * camera.zoom * 0.5f,
+                    0.1f, max_zoom
+                );
                 return true;
             }
-
             @Override
             public boolean touchDown(int screenX, int screenY, int pointer, int button) {
                 uiManager.pressClick(screenX, screenY, button);
                 return true;
             }
-
             @Override
             public boolean touchUp(int screenX, int screenY, int pointer, int button) {
                 uiManager.releaseClick(screenX, screenY, button);
                 return true;
             }
-
             @Override
             public boolean touchDragged(int screenX, int screenY, int pointer) {
                 uiManager.updateMousePosition(screenX, screenY);
@@ -120,15 +124,17 @@ public class GameScreen implements Screen {
             }
         });
 
-        Settings.RENDERDISTANCE = (int) (camera.zoom * 1.5f + 1f);
-        System.out.println(Settings.RENDERDISTANCE);
+        Settings.RENDERDISTANCE = (int) (camera.zoom * 0.9f + 1f);
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
             uiManager.toggleInventory();
         }
 
-        if (getBlockAtCursor() == BlockType.CRAFTING_TABLE && Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT) && player.isInRange(getBlockGlobalXAtCursor(), getBlockGlobalYAtCursor())
-        && !player.inMenu) {
+        // Crafting-Table Interaktion (nur lokalPlayer)
+        if (localPlayer.getBlockAtCursor() == BlockType.CRAFTING_TABLE
+            && Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT)
+            && localPlayer.isInRange(localPlayer.getBlockGlobalXAtCursor(), localPlayer.getBlockGlobalYAtCursor())
+            && !localPlayer.inMenu) {
             uiManager.toggleCraftingTable();
         }
 
@@ -137,117 +143,29 @@ public class GameScreen implements Screen {
 
         camera.update();
 
-        if (!player.inMenu) {
-            handleBlockBreaking();
-            handleBlockPlacing();
+        // 4) Alle Spieler‐Entitäten abarbeiten und ggf. Drops sammeln
+        List<DroppedItem> toAdd = new ArrayList<>();
+        for (com.example.cubearia.game.entities.Entity e : world.getEntities()) {
+            if (e instanceof Player) {
+                Player p = (Player) e;
+                if (!p.inMenu) {
+                    DroppedItem drop = p.handleBlockBreaking();
+                    if (drop != null) {
+                        toAdd.add(drop);
+                    }
+                    p.handleBlockPlacing();
+                }
+            }
+        }
+
+        // 5) Erst NACHDEM wir alle Spieler durchlaufen haben, fügen wir neue Drops zur Welt hinzu
+        for (DroppedItem d : toAdd) {
+            world.addEntity(d);
         }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.F4)) {
             debugRenderer.toggle();
         }
-    }
-
-    public int getBlockGlobalXAtCursor() {
-        Vector3 mousePos = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
-        camera.unproject(mousePos);
-        return toTileIndex(mousePos.x);
-    }
-
-    public int getBlockGlobalYAtCursor() {
-        Vector3 mousePos = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
-        camera.unproject(mousePos);
-        return toTileIndex(mousePos.y);
-    }
-
-    public BlockType getBlockAtCursor() {
-        int globalX = getBlockGlobalXAtCursor();
-        int globalY = getBlockGlobalYAtCursor();
-        return world.getBlock(globalX, globalY);
-    }
-
-    private void handleBlockBreaking() {
-        int globalX = getBlockGlobalXAtCursor();
-        int globalY = getBlockGlobalYAtCursor();
-        BlockType block = getBlockAtCursor();
-
-        if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
-            if (player.isInRange(globalX, globalY) && block.isBreakable()) {
-                float toolLevel = player.getInventory().getSlot(player.selectedSlot) != null ?
-                    player.getInventory().getSlot(player.selectedSlot).getItem().getToolLevel()
-                    : 0;
-                float toolType = player.getInventory().getSlot(player.selectedSlot) != null ?
-                    player.getInventory().getSlot(player.selectedSlot).getItem().getType()
-                    : 0;
-                float perferredTool = block.getPreferredTool();
-                float minLevel  = block.getMinLevel();
-                float requiredToolType  = block.getPreferredTool();
-                float hardness  = block.getHardness();
-                if (!isBreaking || globalX != breakingX || globalY != breakingY) {
-                    breakingX = globalX;
-                    breakingY = globalY;
-
-                    if (toolLevel >= minLevel && toolType == requiredToolType) {
-                        breakingTimeTotal = hardness / (2f + (toolLevel - minLevel) * 5f);
-                    } else {
-                        breakingTimeTotal = hardness * 0.5f;
-                    }
-
-                    breakingTimer = 0f;
-                    isBreaking = true;
-                } else {
-                    breakingTimer += Gdx.graphics.getDeltaTime();
-                    if (breakingTimer >= breakingTimeTotal || Settings.CREATIVE_MODE) {
-                        world.setBlock(breakingX, breakingY, BlockType.AIR);
-                        Item dropping_item = Item.valueOf(block.getDroppingItem());
-                        DroppedItem drop = null;
-                        if (dropping_item != null && block.getMinLevel() == 0
-                            || perferredTool == toolType
-                            && minLevel <= toolLevel) {
-                            drop = new DroppedItem(world,
-                                breakingX, breakingY + 0.25f,
-                                dropping_item,
-                                MathUtils.random(5f, 8f) * (MathUtils.randomBoolean() ? 1 : -1),
-                                MathUtils.random(2f, 3f),
-                                1
-                            );
-                            world.addEntity(drop);
-                        }
-                        isBreaking = false;
-                    }
-                }
-            } else {
-                isBreaking = false;
-            }
-        } else {
-            isBreaking = false;
-        }
-    }
-
-    private void handleBlockPlacing() {
-        if (!Gdx.input.isButtonPressed(Input.Buttons.RIGHT)) return;
-
-        int globalX = getBlockGlobalXAtCursor();
-        int globalY = getBlockGlobalYAtCursor();
-
-        if (!player.isInRange(globalX, globalY)) return;
-        if (world.getBlock(globalX, globalY) != BlockType.AIR && world.getBlock(globalX, globalY) != BlockType.WATER) return;
-        if (player.intersects(globalX, globalY)) return;
-
-        int slotIndex = player.selectedSlot;
-        ItemStack stack = inventory.getSlot(slotIndex);
-        if (stack == null || stack.isEmpty()) return;
-
-        BlockType blockToPlace = BlockType.valueOf(stack.getItem().getId().toUpperCase());
-        world.setBlock(globalX, globalY, blockToPlace);
-
-        stack.decrease(1);
-        if (stack.isEmpty()) {
-            inventory.removeItem(slotIndex);
-        }
-    }
-
-    private int toTileIndex(float pixelCoord) {
-        return (int)Math.floor(pixelCoord / TILE_SIZE);
     }
 
     @Override
@@ -260,23 +178,37 @@ public class GameScreen implements Screen {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
 
-        final int COLUMNS = 4;
-        new Renderer().renderWorld(world, player, batch, camera);
+        new Renderer().renderWorld(world, localPlayer, batch, camera);
 
-        if (isBreaking) {
-            float progress = breakingTimer / breakingTimeTotal;
-            int frameIndex = Math.min((int)(progress * 4), 3);
-            TextureRegion currentFrame = Assets.breakingFrames[frameIndex];
-            batch.draw(currentFrame, breakingX * TILE_SIZE, breakingY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        for (com.example.cubearia.game.entities.Entity e : world.getEntities()) {
+            if (e instanceof Player) {
+                Player p = (Player) e;
+                if (p.isBreaking()) {
+                    TextureRegion frame = p.getBreakingFrame();
+                    int bx = p.getBreakingX();
+                    int by = p.getBreakingY();
+                    batch.draw(
+                        frame,
+                        bx * TILE_SIZE,
+                        by * TILE_SIZE,
+                        TILE_SIZE,
+                        TILE_SIZE
+                    );
+                }
+            }
         }
 
         world.renderEntities(batch);
+
+        world.renderParticles(batch);
+
         batch.end();
 
+        // 4) UI‐Schicht (Inventar, Crafting etc.) nur für localPlayer
         batch.setProjectionMatrix(uiCamera.combined);
         batch.begin();
         uiManager.render(batch);
-        debugRenderer.render(batch, player, getBlockAtCursor(), world);
+        debugRenderer.render(batch, localPlayer, localPlayer.getBlockAtCursor(), world);
         batch.end();
     }
 
@@ -291,7 +223,8 @@ public class GameScreen implements Screen {
     @Override public void pause() {}
     @Override public void resume() {}
     @Override public void hide() {}
-    @Override public void dispose() {
+    @Override
+    public void dispose() {
         batch.dispose();
         debugFont.dispose();
         Assets.dispose();

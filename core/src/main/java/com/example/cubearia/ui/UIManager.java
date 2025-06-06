@@ -129,7 +129,7 @@ public class UIManager {
         } else if (craftingTableOpen) {
             craftingMenuUI.render(batch, uiCamera);
         } else {
-            hotbarUI.render(batch, uiCamera, player.selectedSlot);
+            hotbarUI.render(batch, uiCamera, player.getSelectedSlot());
         }
     }
 

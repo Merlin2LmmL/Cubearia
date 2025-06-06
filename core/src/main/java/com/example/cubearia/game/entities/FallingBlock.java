@@ -1,18 +1,16 @@
-package com.example.cubearia.game.inventory;
+package com.example.cubearia.game.entities;
 
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
-import com.example.cubearia.game.entities.Entity;
 import com.example.cubearia.game.GameScreen;
-import com.example.cubearia.game.entities.Player;
+import com.example.cubearia.game.inventory.Item;
 import com.example.cubearia.game.world.BlockType;
 import com.example.cubearia.game.world.World;
 
-public class DroppedItem extends Entity {
-    private final World world;      // referenz auf die Welt
-    private final Item item;
-    private int quantity;
+public class FallingBlock extends Entity {
+    private final World world;
+    private final BlockType block;
     private float lifetime = 0f;
     private static final float MAX_LIFETIME = 60f; // nach 60 s verschwindet das Item
     private float velocityX = 0f;
@@ -22,13 +20,12 @@ public class DroppedItem extends Entity {
     public final float friction = 100f;
     private boolean inFluid = false;
 
-    public DroppedItem(World world, float x, float y, Item item, float velocityX, float velocityY, int quantity) {
-        super(x, y, 0.5f, 0.5f);
-        this.world    = world;
-        this.item     = item;
+    public FallingBlock(World world, float x, float y, BlockType block, float velocityX, float velocityY) {
+        super(x, y, 1, 1);
+        this.world      = world;
+        this.block      = block;
         this.velocityX = velocityX;
         this.velocityY = velocityY;
-        this.quantity = quantity;
     }
 
     @Override
@@ -50,38 +47,26 @@ public class DroppedItem extends Entity {
 
         applyFriction(delta);
         moveWithCollision(delta);
-        if (lifetime >= MAX_LIFETIME) {
+
+        if (onGround) {
+            world.setBlock((int) (x + 0.5),(int) y, block);
             remove();
-            return;
         }
 
-        // Aufsammel‑Logik: Spieler-Entity in Reichweite?
-        for (Entity e : world.getEntities()) {
-            if (e instanceof Player) {
-                Player p = (Player) e;
-                float dx = (p.x + p.width/2) - (x + width/2);
-                float dy = (p.y + p.height/2) - (y + height/2);
-                if (dx*dx + dy*dy < 1.2f && p.getInventory().hasSpace()) {
-                    int leftovers = p.getInventory().addItem(item, quantity);
-                    quantity = leftovers;
-                    break;
-                }
-            }
+        if (lifetime >= MAX_LIFETIME) {
+            remove();
         }
-        if (quantity <= 0) remove();
     }
 
     @Override
     public void render(SpriteBatch batch) {
-        float sizePX = GameScreen.TILE_SIZE * 0.5f;
-        float offset = (GameScreen.TILE_SIZE - sizePX) / 2f; // zentrieren
-
-        float hoverOffset = (float)Math.sin(lifetime * 2f) * 0.1f + 0.1f; // 2f = Speed, 0.1f = Höhe
+        float sizePX = GameScreen.TILE_SIZE * ((width + height) / 2f);
+        float offset = (GameScreen.TILE_SIZE - sizePX) / 2f;
 
         batch.draw(
-            item.getIcon(),
+            block.getRegion(),
             x * GameScreen.TILE_SIZE + offset,
-            (y + hoverOffset) * GameScreen.TILE_SIZE,
+            y * GameScreen.TILE_SIZE,
             sizePX, sizePX
         );
     }
@@ -92,7 +77,6 @@ public class DroppedItem extends Entity {
     }
 
     private void moveWithCollision(float delta) {
-        // Save old pos
         float oldX = x;
         float oldY = y;
 
@@ -117,7 +101,6 @@ public class DroppedItem extends Entity {
             onGround = false;
         }
     }
-
 
     private boolean checkCollision() {
         int startX = (int)Math.floor(x);

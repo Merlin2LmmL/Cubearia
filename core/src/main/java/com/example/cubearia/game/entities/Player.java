@@ -10,29 +10,36 @@ import com.badlogic.gdx.math.Vector3;
 import com.example.cubearia.game.Assets;
 import com.example.cubearia.game.GameScreen;
 import com.example.cubearia.game.Settings;
+import com.example.cubearia.game.entities.particle.Particle;
 import com.example.cubearia.game.inventory.Inventory;
 import com.example.cubearia.game.inventory.Item;
+import com.example.cubearia.game.inventory.ItemRegistry;
+import com.example.cubearia.game.inventory.ItemStack;
 import com.example.cubearia.game.world.BlockType;
 import com.example.cubearia.game.world.Chunk;
 import com.example.cubearia.game.world.World;
 
+/**
+ * Ein Spieler‐Entity, das sich um Bewegung, Kollision,
+ * Blockabbau/-platzierung und Animation kümmert.
+ */
 public class Player extends Entity {
     private final OrthographicCamera camera;
     private final Inventory inventory;
 
-    public float velocityX = 0f;
-    public float velocityY = 0f;
+    private float velocityX = 0f;
+    private float velocityY = 0f;
 
-    public final float gravity = -40f;
-    public final float jumpVelocity = (float) (10f * Math.sqrt(size));
-    public final float moveAcceleration = 30f * size;
-    public final float airControlFactor = 0.4f;
-    public final float friction = 100f;
-    public float finalmaxSpeed = 6f * size;
-    public final int range = 5 * size;
+    private final float gravity = -40f;
+    private final float jumpVelocity = (float) (10f * Math.sqrt(size));
+    private final float moveAcceleration = 30f * size;
+    private final float airControlFactor = 0.4f;
+    private final float friction = 100f;
+    private float finalmaxSpeed = 6f * size;
+    private final int range = 5 * size;
 
-    public int selectedSlot = 0;
-    public boolean inventoryOpen;
+    private int selectedSlot = 0;
+    private boolean inventoryOpen;
     public boolean inMenu;
 
     public boolean onGround = false;
@@ -52,29 +59,38 @@ public class Player extends Entity {
     private final TextureRegion leftarmRegion;
     private final TextureRegion rightarmRegion;
 
-    private static int size = 2;
+    private static int size = 1;
 
-    private static final float LEG_AMPLITUDE = 20f;       // Maximum rotation angle
-    private static final float LEG_FREQUENCY = 10f / size;       // Speed of cycle
-    private static final float LEG_CHUNK_STEP = 7f;      // Chunky rotation step
+    private static final float LEG_AMPLITUDE = 20f;
+    private static final float LEG_FREQUENCY = 10f / size;
+    private static final float LEG_CHUNK_STEP = 7f;
 
     private final World world;
+
+    // Felder für Block‐Breaking
+    private float breakingTimer = 0f;
+    private float breakingTimeTotal = 0f;
+    private int breakingX = -1, breakingY = -1;
+    private boolean isBreaking = false;
 
     public Player(World world, OrthographicCamera camera, Inventory inventory) {
         super(0, Chunk.HEIGHT, 0.375f * size, 1.82f * size);
         this.world = world;
         this.camera = camera;
         this.inventory = inventory;
-        inventory.addItem(Item.valueOf("DIRT"), 64 * 4);
+
+        // Beispiel‐Starter‐Items
+        inventory.addItem(Item.valueOf("WATER"), 64 * 4);
         inventory.addItem(Item.valueOf("OAK_LOG"), 64 * 4);
         inventory.addItem(Item.valueOf("COBBLESTONE"), 64 * 4);
-        // Prepare texture regions
-        headRegion = new TextureRegion(Assets.playerTexture,        6 * size,   0 * size,   8 * size, 8 * size);
-        bodyRegion = new TextureRegion(Assets.playerTexture,        0 * size,   0 * size,   6 * size, 12 * size);
-        leftlegRegion  = new TextureRegion(Assets.playerTexture,    0 * size,   12 * size,  3 * size, 10 * size);
-        rightlegRegion  = new TextureRegion(Assets.playerTexture,   3 * size,   12 * size,  3 * size, 10 * size);
-        leftarmRegion  = new TextureRegion(Assets.playerTexture,    6 * size,   8 * size,   4 * size, 11 * size);
-        rightarmRegion  = new TextureRegion(Assets.playerTexture,   10 * size,  8 * size,   4 * size, 11 * size);
+
+        // TextureRegions initialisieren
+        headRegion    = new TextureRegion(Assets.playerTexture,      6 * size,   0 * size,   8 * size, 8 * size);
+        bodyRegion    = new TextureRegion(Assets.playerTexture,      0 * size,   0 * size,   6 * size, 12 * size);
+        leftlegRegion = new TextureRegion(Assets.playerTexture,      0 * size,  12 * size,  3 * size, 10 * size);
+        rightlegRegion= new TextureRegion(Assets.playerTexture,      3 * size,  12 * size,  3 * size, 10 * size);
+        leftarmRegion = new TextureRegion(Assets.playerTexture,      6 * size,   8 * size,   4 * size, 11 * size);
+        rightarmRegion= new TextureRegion(Assets.playerTexture,     10 * size,   8 * size,   4 * size, 11 * size);
     }
 
     @Override
@@ -84,12 +100,14 @@ public class Player extends Entity {
             x = (float) (Math.random() - 0.5) * 20000;
         }
 
+
+
         stateTime += delta;
 
         boolean left  = false;
         boolean right = false;
         if (!inMenu) {
-            left = Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
+            left  = Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
             right = Gdx.input.isKeyPressed(Input.Keys.D) || Gdx.input.isKeyPressed(Input.Keys.RIGHT);
 
             for (int i = 0; i <= 9; i++) {
@@ -101,22 +119,22 @@ public class Player extends Entity {
 
         checkFluidState();
 
-        // Walk Cycle
+        // Walk‐Cycle
         if (velocityX != 0) {
             walkCycleTime += Math.abs(velocityX) * delta * (onGround ? 0.3f : 0.1f);
         } else {
             walkCycleTime = 0f;
         }
 
-        float accel = moveAcceleration * delta ;
+        float accel = moveAcceleration * delta;
         float airAccel = accel * airControlFactor;
 
         if (onGround) {
-            if (left) velocityX -= accel * (facingLeft() ? 1f : 0.5f);
+            if (left)  velocityX -= accel * (facingLeft() ? 1f : 0.5f);
             if (right) velocityX += accel * (facingLeft() ? 0.5f : 1f);
             if (!left && !right) applyFriction(delta);
         } else {
-            if (left) velocityX -= airAccel * (facingLeft() ? 1f : 0.5f);
+            if (left)  velocityX -= airAccel * (facingLeft() ? 1f : 0.5f);
             if (right) velocityX += airAccel * (facingLeft() ? 0.5f : 1f);
             if (!left && !right) applyFriction(delta / 10);
         }
@@ -135,28 +153,28 @@ public class Player extends Entity {
         }
 
         if (inFluid) {
-            velocityY += gravity * 0.2f * delta; // weniger Gravitation im Wasser
+            velocityY += gravity * 0.2f * delta;
             if (world.getBlock((int) x, (int) (Math.round(y + 0.25f))) == BlockType.WATER) {
-                velocityY = MathUtils.clamp(velocityY, -3f, 3f); // nicht zu schnell fallen
+                velocityY = MathUtils.clamp(velocityY, -3f, 3f);
             } else {
-                velocityY = MathUtils.clamp(velocityY, -3f, 3f); // nicht zu schnell fallen
+                velocityY = MathUtils.clamp(velocityY, -3f, 3f);
             }
         } else {
             velocityY += gravity * delta;
         }
 
-        // Movement + Kollision
+        // Bewegung + Kollision
         moveWithCollision(delta);
 
-        // Umgebung ggf. neu laden
+        // Umgebung nachladen
         world.updateAroundPlayer(x);
 
-        norminatedHight = 0.3f * (float) Math.pow((double) (world.getBiomeTypeAt((int) y).getTemperatureValue()), 2) - ((y - Settings.SEA_LEVEL) / (Settings.SEA_LEVEL));
+        norminatedHight = 0.3f * (float) Math.pow((double) (world.getBiomeTypeAt((int) y).getTemperatureValue()), 2)
+            - ((y - Settings.SEA_LEVEL) / (Settings.SEA_LEVEL));
         norminatedHight = MathUtils.clamp(norminatedHight, 0, 1);
-        temperatureDamage = (2/(1-norminatedHight) - 2);
+        temperatureDamage = (2 / (1 - norminatedHight) - 2);
     }
 
-    // Hilfsmethode zur Bodenreibung
     private void applyFriction(float frictionAmount) {
         if (velocityX > 0) {
             velocityX -= friction * frictionAmount;
@@ -167,23 +185,19 @@ public class Player extends Entity {
         }
     }
 
-    // Bewegung und Block-Kollisionen
     private void moveWithCollision(float delta) {
-        // Merke alten Zustand
         float oldX = x, oldY = y;
 
-        // 1) X‑Bewegung + Kollision
+        // X-Bewegung
         x += velocityX * delta;
         if (checkCollision()) {
-            // Bei Kollision: zurücksetzen
             x = oldX;
             velocityX = 0;
         }
 
-        // 2) Y‑Bewegung + Kollision
+        // Y-Bewegung
         y += velocityY * delta;
         if (checkCollision()) {
-            // Bei Kollision:
             y = oldY;
             if (velocityY < 0) onGround = true;
             velocityY = 0;
@@ -191,7 +205,6 @@ public class Player extends Entity {
             onGround = false;
         }
     }
-
 
     private boolean checkCollision() {
         int startX = (int)Math.floor(x);
@@ -217,9 +230,226 @@ public class Player extends Entity {
     }
 
     public boolean intersects(int globalX, int globalY) {
-        return (globalX == (int) x && globalY == (int) y) || (globalX == (int) x && globalY == (int) y + 1);
+        if (x >= 0) {
+            return (globalX == (int) x && globalY == (int) y + 1)
+                || (globalX == (int) x && globalY == (int) y);
+        } else {
+            return (globalX == (int) x - 1 && globalY == (int) y + 1)
+                || (globalX == (int) x - 1 && globalY == (int) y);
+        }
     }
 
+    public Inventory getInventory() {
+        return inventory;
+    }
+
+    public float getX() {
+        return x;
+    }
+
+    public float getY() {
+        return y;
+    }
+
+    public float getTemperatureDamage() {
+        return temperatureDamage;
+    }
+
+    public float getVelocityX() {
+        return velocityX;
+    }
+
+    public float getVelocityY() {
+        return velocityY;
+    }
+
+    public int getSelectedSlot() {
+        return selectedSlot;
+    }
+
+    /**
+     * Versucht, den Block unter dem Cursor abzubauen.
+     * GIBT ein DroppedItem zurück, falls tatsächlich ein Drop entstehen soll,
+     * andernfalls null.
+     */
+    public DroppedItem handleBlockBreaking() {
+        int globalX = getBlockGlobalXAtCursor();
+        int globalY = getBlockGlobalYAtCursor();
+        BlockType block = getBlockAtCursor();
+
+        if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
+            if (isInRange(globalX, globalY) && block.isBreakable()) {
+                float toolLevel = inventory.getSlot(selectedSlot) != null
+                    ? inventory.getSlot(selectedSlot).getItem().getToolLevel()
+                    : 0;
+                float toolType = inventory.getSlot(selectedSlot) != null
+                    ? inventory.getSlot(selectedSlot).getItem().getType()
+                    : 0;
+                float preferredTool = block.getPreferredTool();
+                float minLevel  = block.getMinLevel();
+                float requiredToolType  = block.getPreferredTool();
+                float hardness  = block.getHardness();
+
+                // a) Neuer Abbauvorgang
+                if (!isBreaking || globalX != breakingX || globalY != breakingY) {
+                    breakingX = globalX;
+                    breakingY = globalY;
+
+                    if (toolLevel >= minLevel && toolType == requiredToolType) {
+                        breakingTimeTotal = hardness / (2f + (toolLevel - minLevel) * 5f);
+                    } else {
+                        breakingTimeTotal = hardness * 0.5f;
+                    }
+                    if (breakingTimeTotal <= 0f) breakingTimeTotal = 0.1f;
+                    breakingTimer = 0f;
+                    isBreaking = true;
+                    return null;
+                }
+
+                // b) Fortlaufender Abbau
+                breakingTimer += Gdx.graphics.getDeltaTime();
+
+                // Particles
+                if (Math.random() < 0.01f) {
+                    TextureRegion blockTex = block.getRegion();
+                    int texWidth = blockTex.getRegionWidth();
+                    int texHeight = blockTex.getRegionHeight();
+
+                    float spawnX = breakingX + 0.5f + MathUtils.random(-0.6f, 0.6f);
+                    float spawnY = breakingY + 0.5f + MathUtils.random(-0.6f, 0.6f);
+                    float velX = MathUtils.random(-1f, 1f);
+                    float velY = MathUtils.random(0.5f, 2f);
+
+                    int px = MathUtils.random(0, texWidth - 2);
+                    int py = MathUtils.random(0, texHeight - 2);
+
+                    TextureRegion pixelTex = new TextureRegion(blockTex.getTexture(),
+                        blockTex.getRegionX() + px,
+                        blockTex.getRegionY() + py,
+                        2, 2
+                    );
+
+                    Particle particle = new Particle(spawnX, spawnY, velX, velY, 0.3f, pixelTex);
+                    world.spawnParticle(particle);
+                }
+
+                if (breakingTimer >= breakingTimeTotal || Settings.CREATIVE_MODE) {
+                    world.setBlock(breakingX, breakingY, BlockType.AIR);
+
+                    DroppedItem drop = null;
+                    String dropId = block.getDroppingItem();
+                    if (dropId != null && !dropId.isEmpty()) {
+                        Item dropping_item = Item.valueOf(dropId);
+                        if (dropping_item != null
+                            && (block.getMinLevel() == 0
+                            || (preferredTool == toolType && minLevel <= toolLevel))) {
+                            drop = new DroppedItem(
+                                world,
+                                breakingX,
+                                breakingY + 0.25f,
+                                dropping_item,
+                                MathUtils.random(5f, 8f) * (MathUtils.randomBoolean() ? 1 : -1),
+                                MathUtils.random(2f, 3f),
+                                1
+                            );
+                        }
+                    }
+
+                    world.blockUpdate(breakingX, breakingY, true);
+
+                    isBreaking = false;
+                    return drop;
+                }
+            } else {
+                isBreaking = false;
+                return null;
+            }
+        } else {
+            isBreaking = false;
+            return null;
+        }
+        return null;
+    }
+
+    /**
+     * Versucht, den Block unter dem Cursor zu platzieren.
+     * Wird direkt ausgeführt, ohne Drop-Rückgabe.
+     */
+    public void handleBlockPlacing() {
+        if (!Gdx.input.isButtonPressed(Input.Buttons.RIGHT)) return;
+
+        int globalX = getBlockGlobalXAtCursor();
+        int globalY = getBlockGlobalYAtCursor();
+
+        if (!isInRange(globalX, globalY)) return;
+        if (world.getBlock(globalX, globalY) != BlockType.AIR
+            && world.getBlock(globalX, globalY) != BlockType.WATER) return;
+        if (intersects(globalX, globalY)) return;
+
+        int slotIndex = selectedSlot;
+        ItemStack stack = inventory.getSlot(slotIndex);
+        if (stack == null || stack.isEmpty()) return;
+
+        BlockType blockToPlace = BlockType.valueOf(stack.getItem().getId().toUpperCase());
+        world.setBlock(globalX, globalY, blockToPlace);
+        world.blockUpdate(globalX, globalY, true);
+
+        stack.decrease(1);
+        if (stack.isEmpty()) {
+            inventory.removeItem(slotIndex);
+        }
+    }
+
+    /** Gibt zurück, ob gerade abgebaut wird. */
+    public boolean isBreaking() {
+        return isBreaking;
+    }
+
+    /** X‐Koordinate des aktuell abgebauten Blocks (oder –1). */
+    public int getBreakingX() {
+        return breakingX;
+    }
+
+    /** Y‐Koordinate des aktuell abgebauten Blocks (oder –1). */
+    public int getBreakingY() {
+        return breakingY;
+    }
+
+    /**
+     * Gibt das TextureRegion für die Abbau-Animation zurück.
+     * Falls breakingTimeTotal ≤ 0, wird sicherheitshalber Frame 0 genommen.
+     */
+    public TextureRegion getBreakingFrame() {
+        if (breakingTimeTotal <= 0f) {
+            return Assets.breakingFrames[0];
+        }
+        float progress = breakingTimer / breakingTimeTotal;
+        int frameIndex = Math.min((int)(progress * 4), 3);
+        return Assets.breakingFrames[frameIndex];
+    }
+
+    // Hilfsmethoden, um aus Mauskoordianten Blockkoordinaten zu berechnen
+    public int getBlockGlobalXAtCursor() {
+        Vector3 mousePos = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+        camera.unproject(mousePos);
+        return toTileIndex(mousePos.x);
+    }
+    public int getBlockGlobalYAtCursor() {
+        Vector3 mousePos = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+        camera.unproject(mousePos);
+        return toTileIndex(mousePos.y);
+    }
+    public BlockType getBlockAtCursor() {
+        int globalX = getBlockGlobalXAtCursor();
+        int globalY = getBlockGlobalYAtCursor();
+        return world.getBlock(globalX, globalY);
+    }
+    private int toTileIndex(float pixelCoord) {
+        return (int)Math.floor(pixelCoord / GameScreen.TILE_SIZE);
+    }
+
+    // Render-methoden für den Spieler
+    @Override
     public void render(SpriteBatch batch) {
         renderAt(batch, x, y, size);
     }
@@ -247,7 +477,7 @@ public class Player extends Entity {
         float pivotY = headY + originY;
 
         float angleRad = (float)Math.atan2(
-            mouse.y - pivotY - 4 * scale, // vorher: 4 * size → falsch
+            mouse.y - pivotY - 4 * scale,
             mouse.x - pivotX
         );
         float angleDeg = angleRad * MathUtils.radiansToDegrees;
@@ -332,29 +562,19 @@ public class Player extends Entity {
         float scale = GameScreen.TILE_SIZE / 16f;
         float baseX = x * GameScreen.TILE_SIZE;
 
-        // Mausposition in Weltkoords
         Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
         camera.unproject(mouse);
 
-        // Kopf-Dimensionen & Offset
-        float headSize   = 8 * scale;
-        float headOffsetX= flip
+        float headSize    = 8 * scale;
+        float headOffsetX = flip
             ? bodyRegion.getRegionWidth() + 4*scale - headSize
             : -1 * scale;
         float headOffsetY = 22 * scale;
 
-        // Position unten links zum Zeichnen
         float headX = baseX + headOffsetX;
-
-        // Pivot unten-Mitte
         float originX = headSize / 2f;
         float pivotX  = headX + originX;
 
-        // Spiegelflage: wenn Cursor links vom Pivot
         return mouse.x < pivotX;
-    }
-
-    public Inventory getInventory() {
-        return inventory;
     }
 }

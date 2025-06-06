@@ -1,6 +1,6 @@
 package com.example.cubearia.game.inventory;
 
-import com.example.cubearia.game.inventory.DroppedItem;
+import com.example.cubearia.game.entities.DroppedItem;
 import com.example.cubearia.game.entities.Player;
 import com.example.cubearia.game.world.World;
 
