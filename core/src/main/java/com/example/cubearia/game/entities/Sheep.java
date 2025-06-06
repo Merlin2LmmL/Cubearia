@@ -1,7 +1,6 @@
 package com.example.cubearia.game.entities;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -9,12 +8,6 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector3;
 import com.example.cubearia.game.Assets;
 import com.example.cubearia.game.GameScreen;
-import com.example.cubearia.game.Settings;
-import com.example.cubearia.game.entities.particle.Particle;
-import com.example.cubearia.game.inventory.Inventory;
-import com.example.cubearia.game.inventory.Item;
-import com.example.cubearia.game.inventory.ItemRegistry;
-import com.example.cubearia.game.inventory.ItemStack;
 import com.example.cubearia.game.world.BlockType;
 import com.example.cubearia.game.world.Chunk;
 import com.example.cubearia.game.world.World;
@@ -34,7 +27,7 @@ public class Sheep extends Entity {
     private final float moveAcceleration = 30f * size;
     private final float airControlFactor = 0.4f;
     private final float friction = 100f;
-    private float finalmaxSpeed = 6f * size;
+    private final float finalmaxSpeed = 6f * size;
 
     public boolean onGround = false;
     private boolean inFluid = false;
@@ -49,7 +42,7 @@ public class Sheep extends Entity {
     private final TextureRegion leftlegRegion;
     private final TextureRegion rightlegRegion;
 
-    private static int size = 1;
+    private static final int size = 1;
 
     private static final float LEG_AMPLITUDE = 20f;
     private static final float LEG_FREQUENCY = 10f / size;
