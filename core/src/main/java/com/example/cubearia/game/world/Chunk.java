@@ -95,7 +95,7 @@ public class Chunk {
             BlockType below = world.getBlock(globalX, belowY);
 
             // Wenn unterhalb Luft ist, Sand fallen lassen
-            if (belowY >= 0 && below == BlockType.AIR) {
+            if (belowY >= 0 && !below.isSolid()) {
                 // Alten Sandblock (im Chunk) auf AIR setzen
                 world.setBlock(globalX, y, BlockType.AIR);
 

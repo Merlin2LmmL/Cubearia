@@ -60,7 +60,7 @@ public class GameScreen implements Screen {
         inventory = new Inventory(9, 4);
         localPlayer = new Player(world, camera, inventory);
         world.addEntity(localPlayer);
-        sheep = new Sheep(world, camera);
+        sheep = new Sheep(world, camera, localPlayer, true);
         world.addEntity(sheep);
         uiManager = new UIManager(localPlayer, uiCamera, world, inventory);
         max_zoom = Settings.DEBUG ? 80 : 10;

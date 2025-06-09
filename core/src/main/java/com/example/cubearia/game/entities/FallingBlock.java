@@ -49,7 +49,7 @@ public class FallingBlock extends Entity {
         moveWithCollision(delta);
 
         if (onGround) {
-            world.setBlock((int) (x + 0.5),(int) y, block);
+            world.setBlock((int) (x),(int) y, block);
             remove();
         }
 

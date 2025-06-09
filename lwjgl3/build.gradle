@@ -183,3 +183,17 @@ startScripts.classpath = project.tasks.jar.outputs.files
 if(enableGraalNative == 'true') {
   apply from: file("nativeimage.gradle")
 }
+
+// Fat JAR mit allen Abhängigkeiten
+task fatJar(type: Jar) {
+  archiveBaseName = 'Cubearia'
+  archiveVersion = '1.0'
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+  manifest {
+    attributes 'Main-Class': 'dein.paket.desktop.DesktopLauncher'
+  }
+  from {
+    configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+  }
+  with jar
+}

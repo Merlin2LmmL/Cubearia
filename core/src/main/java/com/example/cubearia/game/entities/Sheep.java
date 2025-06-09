@@ -12,12 +12,15 @@ import com.example.cubearia.game.world.BlockType;
 import com.example.cubearia.game.world.Chunk;
 import com.example.cubearia.game.world.World;
 
+import static com.example.cubearia.game.GameScreen.TILE_SIZE;
+
 /**
  * Ein Spieler‐Entity, das sich um Bewegung, Kollision,
  * Blockabbau/-platzierung und Animation kümmert.
  */
 public class Sheep extends Entity {
     private final OrthographicCamera camera;
+    private Player player;
 
     private float velocityX = 0f;
     private float velocityY = 0f;
@@ -27,15 +30,18 @@ public class Sheep extends Entity {
     private final float moveAcceleration = 30f * size;
     private final float airControlFactor = 0.4f;
     private final float friction = 100f;
-    private final float finalmaxSpeed = 6f * size;
+    private final float finalmaxSpeed = 2f * size;
 
     public boolean onGround = false;
     private boolean inFluid = false;
 
     private float stateTime = 0f;
     private float walkCycleTime = 0f;
-    private boolean flip = false;
-
+    private boolean facingLeft = false;
+    int aiAction = -1;
+    double aiActionTimer = 0;
+    int targetX = 0;
+    int targetY = 0;
 
     private final TextureRegion headRegion;
     private final TextureRegion bodyRegion;
@@ -44,22 +50,26 @@ public class Sheep extends Entity {
 
     private static final int size = 1;
 
+    private static boolean hasAI = false;
+
     private static final float LEG_AMPLITUDE = 20f;
-    private static final float LEG_FREQUENCY = 10f / size;
+    private static final float LEG_FREQUENCY = 15f / size;
     private static final float LEG_CHUNK_STEP = 7f;
 
     private final World world;
 
-    public Sheep(World world, OrthographicCamera camera) {
-        super(0, Chunk.HEIGHT, 0.375f * size, 1.82f * size);
+    public Sheep(World world, OrthographicCamera camera, Player player, boolean hasAI) {
+        super(0, Chunk.HEIGHT, 1f * size, 0.875f * size);
         this.world = world;
         this.camera = camera;
+        this.player = player;
+        Sheep.hasAI = hasAI;
 
         // TextureRegions initialisieren
-        headRegion      = new TextureRegion(Assets.sheepTexture,    10 * size,  10 * size,      9 * size,   8 * size);
-        bodyRegion      = new TextureRegion(Assets.sheepTexture,    0 * size,   0 * size,       19 * size,  10 * size);
-        leftlegRegion   = new TextureRegion(Assets.sheepTexture,    0 * size,   10 * size,      5 * size,   10 * size);
-        rightlegRegion  = new TextureRegion(Assets.sheepTexture,    5 * size,   10 * size,      5 * size,   10 * size);
+        headRegion      = new TextureRegion(Assets.sheepTexture,    10 * size,  9 * size,   9 * size,   8 * size);
+        bodyRegion      = new TextureRegion(Assets.sheepTexture,    0 * size,   0 * size,   18 * size,  9 * size);
+        leftlegRegion   = new TextureRegion(Assets.sheepTexture,    0 * size,   9 * size,   5 * size,   8 * size);
+        rightlegRegion  = new TextureRegion(Assets.sheepTexture,    5 * size,   9 * size,   5 * size,   8 * size);
     }
 
     @Override
@@ -68,6 +78,24 @@ public class Sheep extends Entity {
 
         boolean left  = false;
         boolean right = false;
+        boolean jump = false;
+
+        if (hasAI) {
+            processAI(delta);
+
+            if (aiAction == 0) {
+                left = true;
+            }
+            if (aiAction == 1) {
+                right = true;
+            }
+            if (aiAction == 2) {
+                targetX = (int) ((player.getX() + player.width / 2) * 16);
+                targetY = (int) ((player.getY() + player.height * 9/10) * 16);
+            }
+
+            if (canJumpOverObstacle(left, right)) jump = true;
+        }
 
         checkFluidState();
 
@@ -82,20 +110,20 @@ public class Sheep extends Entity {
         float airAccel = accel * airControlFactor;
 
         if (onGround) {
-            if (left)  velocityX -= accel * (facingLeft() ? 1f : 0.5f);
-            if (right) velocityX += accel * (facingLeft() ? 0.5f : 1f);
+            if (left)  velocityX -= accel * (facingLeft ? 1f : 0.5f);
+            if (right) velocityX += accel * (facingLeft ? 0.5f : 1f);
             if (!left && !right) applyFriction(delta);
         } else {
-            if (left)  velocityX -= airAccel * (facingLeft() ? 1f : 0.5f);
-            if (right) velocityX += airAccel * (facingLeft() ? 0.5f : 1f);
+            if (left)  velocityX -= airAccel * (facingLeft ? 1f : 0.5f);
+            if (right) velocityX += airAccel * (facingLeft ? 0.5f : 1f);
             if (!left && !right) applyFriction(delta / 10);
         }
 
         float maxSpeed = onGround ? finalmaxSpeed : inFluid ? finalmaxSpeed * 0.5f : finalmaxSpeed * 1.2f;
-        maxSpeed = ((facingLeft() ? true : false) == (left ? true : false)) ? maxSpeed : maxSpeed * 0.5f;
+        // maxSpeed = ((facingLeft) == (left)) ? maxSpeed : maxSpeed * 0.5f;
         velocityX = MathUtils.clamp(velocityX, -maxSpeed, maxSpeed);
 
-        if ((false)) {
+        if ((jump)) {
             if (onGround) {
                 velocityY = jumpVelocity;
                 onGround = false;
@@ -106,7 +134,7 @@ public class Sheep extends Entity {
 
         if (inFluid) {
             velocityY += gravity * 0.2f * delta;
-            if (world.getBlock((int) x, (int) (Math.round(y + 0.25f))) == BlockType.WATER) {
+            if (world.getBlock((int) x, Math.round(y + 0.25f)) == BlockType.WATER) {
                 velocityY = MathUtils.clamp(velocityY, -3f, 3f);
             } else {
                 velocityY = MathUtils.clamp(velocityY, -3f, 3f);
@@ -163,6 +191,16 @@ public class Sheep extends Entity {
         return false;
     }
 
+    private boolean canJumpOverObstacle(boolean left, boolean right) {
+        int dir = right ? 1 : (left ? -1 : 0);
+        int tx = (int) ((x + width / 2)) + dir;
+        int ty = (int) (y);
+        return world.getBlock(tx, ty).isSolid()
+            && !world.getBlock(tx, ty + 1).isSolid()
+            && !world.getBlock(tx, ty + 2).isSolid();
+    }
+
+
     private void checkFluidState() {
         inFluid = world.getBlock((int) x, (int) y).isFluid();
     }
@@ -175,109 +213,134 @@ public class Sheep extends Entity {
         return y;
     }
 
-    private int toTileIndex(float pixelCoord) {
-        return (int)Math.floor(pixelCoord / GameScreen.TILE_SIZE);
-    }
-
     // Render-methoden für den Spieler
     @Override
     public void render(SpriteBatch batch) {
-        renderAt(batch, x, y, size);
+        renderAt(batch, x, y, size, targetX, targetY);
     }
 
-    public void renderAt(SpriteBatch batch, float x, float y, int size) {
-        float scale = (GameScreen.TILE_SIZE / 16f) * size;
-        float baseX = x * GameScreen.TILE_SIZE;
-        float baseY = y * GameScreen.TILE_SIZE;
+    public void renderAt(SpriteBatch batch, float x, float y, int size, int targetX, int targetY) {
+        float scale = (TILE_SIZE / 16f) * size;
+        float baseX = x * TILE_SIZE;
+        float baseY = y * TILE_SIZE;
 
-        float headSize = (headRegion.getRegionHeight() + headRegion.getRegionWidth()) / 2;
-        float headOffsetX = flip
-            ? bodyRegion.getRegionWidth() * scale - headSize - 4 * scale
-            : -1 * scale;
-        float headOffsetY = 11 * scale;
+        float offsetY = 4 * scale; // 4 Pixel nach unten verschieben (Kopf + Körper)
 
-        float headX = baseX + headOffsetX;
-        float headY = baseY + headOffsetY;
+        boolean headFlip = !facingLeft;
+        float dir = headFlip ? -1f : 1f;
 
-        float originX = -headRegion.getRegionWidth();
-        float originY = -headRegion.getRegionHeight();
+        // Kopf
+        float headX = baseX + (headFlip ? (bodyRegion.getRegionHeight() * 3) / 4f : (bodyRegion.getRegionHeight() * -3) / 4f);
+        float headY = (baseY + headRegion.getRegionHeight() * 1/2f * scale - offsetY) + 10;
+        float originX = headRegion.getRegionWidth() * scale;
+        float originY = headRegion.getRegionHeight() / 2f * scale;
         float pivotX = headX + originX;
         float pivotY = headY + originY;
 
-        float angleRad = (float) 0.3f;
+        // Winkel zu globalen Koordinaten targetX, targetY:
+        float angleRad = MathUtils.atan2(targetY - pivotY, targetX - pivotX);
         float angleDeg = angleRad * MathUtils.radiansToDegrees;
+        float finalAngle = headFlip ? angleDeg : 180f + angleDeg;
 
-        boolean headFlip = false;
-        float dir = headFlip ? -1f : 1f;
-
-        float finalAngle = headFlip ? 180f + angleDeg : angleDeg;
-
-        // Kopf zeichnen
         batch.draw(
             headRegion,
-            headX,
-            headY,
+            headX, headY,
             originX, originY,
             headRegion.getRegionWidth() * scale, headRegion.getRegionHeight() * scale,
             dir, 1f,
             finalAngle
         );
 
+        // Beinrotation
         float rawAngle = MathUtils.sin(walkCycleTime * LEG_FREQUENCY) * LEG_AMPLITUDE;
         float leftRot = Math.round(rawAngle / LEG_CHUNK_STEP) * LEG_CHUNK_STEP;
         float rightRot = -leftRot;
 
         // Körper
+        float bodyX = baseX + (headFlip ? bodyRegion.getRegionWidth() * scale : 0);
+        float bodyY = baseY + 10 * scale - offsetY;
+
         batch.draw(
             bodyRegion,
-            baseX + (headFlip ? 6 * scale : 0),
-            baseY + 10 * scale,
+            bodyX, bodyY,
             0f, 0f,
             bodyRegion.getRegionWidth() * scale, bodyRegion.getRegionHeight() * scale,
             dir, 1f,
-            0
+            0f
         );
 
-        // linkes Bein
+        // Linkes Bein
+        float leftLegX = baseX + (headFlip ? (bodyRegion.getRegionWidth() / 1.5f) * scale : 1);
+        float legY = baseY;
+
         batch.draw(
             leftlegRegion,
-            baseX + (headFlip ? (bodyRegion.getRegionWidth() / 1.5f) * scale : 1),
-            baseY,
-            1.5f * scale, 10 * scale,
+            leftLegX, legY,
+            (float) leftlegRegion.getRegionWidth() / 2 * scale, (leftlegRegion.getRegionHeight() * 3f / 4f) * scale,
             leftlegRegion.getRegionWidth() * scale, leftlegRegion.getRegionHeight() * scale,
             dir, 1f,
             -leftRot
         );
 
-        // rechtes Bein
+        // Rechtes Bein
+        float rightLegX = baseX + (headFlip ? 1 : (bodyRegion.getRegionWidth() / 1.5f) * scale);
+
         batch.draw(
             rightlegRegion,
-            baseX + (headFlip ? 1 : (bodyRegion.getRegionWidth() / 1.5f) * scale),
-            baseY,
-            1.5f * scale, 10 * scale,
+            rightLegX, legY,
+            (float) rightlegRegion.getRegionWidth() / 2 * scale, (rightlegRegion.getRegionHeight() * 3f / 4f) * scale,
             rightlegRegion.getRegionWidth() * scale, rightlegRegion.getRegionHeight() * scale,
             dir, 1f,
             -rightRot
         );
     }
 
-    public boolean facingLeft() {
-        float scale = GameScreen.TILE_SIZE / 16f;
-        float baseX = x * GameScreen.TILE_SIZE;
+    private void processAI(float delta) {
+        aiActionTimer -= delta;
+        System.out.println(aiActionTimer);
 
-        Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
-        camera.unproject(mouse);
+        facingLeft = ((float) targetX / 16) < (x + width / 2);
 
-        float headSize    = 8 * scale;
-        float headOffsetX = flip
-            ? bodyRegion.getRegionWidth() + 4*scale - headSize
-            : -1 * scale;
-        float headOffsetY = 22 * scale;
+        if (aiActionTimer <= 0) {
+            if (player.isInRange((int) x, (int) y)) {
+                randomStroll(delta, 3);
+            } else {
+                randomStroll(delta, 2);
+            }
 
-        float headX = baseX + headOffsetX;
-        float originX = headSize / 2f;
-        float pivotX  = headX + originX;
+            if (aiActionTimer > 0) {
+                if (aiAction == 0) {
+                    targetX = (int) ((x - (10 + Math.random() * 30)) * 16);
+                    targetY = (int) ((y + (5 - (Math.random() * 10))) * 16);
+                } else if (aiAction == 1) {
+                    targetX = (int) ((x + (10 + Math.random() * 30)) * 16);
+                    targetY = (int) ((y + (5 - (Math.random() * 10))) * 16);
+                }
+            }
+        }
+    }
 
-        return mouse.x < pivotX;
+    /**
+     * processes actions of the animal. Following actions exist:
+     * 0 → right
+     * 1 → left
+     * 2 → look in random direction
+     *
+     * @param delta delta time since last frame
+     */
+    private void randomStroll(float delta, int actions) {
+        if (Math.random() <= 0.2 * delta) {    // Durch das mal delta verhindern wir die erhöhte Wahrscheinlichkeit bei mehr Frames. 0,2 ≈ 5^-1 → 1 ~ 5 sekunden
+            int min = 2;
+            int max = 7;
+
+            double randomValue = Math.random();
+            for (int i = 0; i < actions; i++) { // So wird immer eine der zufälligen actions ausgewählt.
+                if (randomValue <= (double) (i + 1) / actions) {
+                    aiAction = i;
+                    aiActionTimer = min + Math.random() * (max - min);
+                    break;
+                }
+            }
+        }
     }
 }

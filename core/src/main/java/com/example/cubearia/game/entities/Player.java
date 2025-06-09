@@ -62,7 +62,7 @@ public class Player extends Entity {
     private static int size = 1;
 
     private static final float LEG_AMPLITUDE = 20f;
-    private static final float LEG_FREQUENCY = 10f / size;
+    private static final float LEG_FREQUENCY = 15f / size;
     private static final float LEG_CHUNK_STEP = 7f;
 
     private final World world;
@@ -80,7 +80,7 @@ public class Player extends Entity {
         this.inventory = inventory;
 
         // Beispiel‐Starter‐Items
-        inventory.addItem(Item.valueOf("WATER"), 64 * 4);
+        inventory.addItem(Item.valueOf("DIRT"), 64 * 4);
         inventory.addItem(Item.valueOf("OAK_LOG"), 64 * 4);
         inventory.addItem(Item.valueOf("COBBLESTONE"), 64 * 4);
 
@@ -99,8 +99,6 @@ public class Player extends Entity {
             y = Chunk.HEIGHT;
             x = (float) (Math.random() - 0.5) * 20000;
         }
-
-
 
         stateTime += delta;
 
