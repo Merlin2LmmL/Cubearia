@@ -129,7 +129,7 @@ public class UIManager {
         } else if (craftingTableOpen) {
             craftingMenuUI.render(batch, uiCamera);
         } else {
-            hotbarUI.render(batch, uiCamera, player.getSelectedSlot());
+            hotbarUI.render(batch, uiCamera, player);
         }
     }
 
@@ -138,5 +138,24 @@ public class UIManager {
      */
     public void updateMousePosition(float screenX, float screenY) {
         // Bei Bedarf implementieren
+    }
+
+    /**
+     * Handle window resize events
+     */
+    public void resize(int width, int height) {
+        // Update UI camera
+        uiCamera.setToOrtho(false, width, height);
+        
+        // Update UI components if they need to know about size changes
+        if (inventoryUI != null) {
+            // Inventory UI might need to recalculate positions
+        }
+        if (craftingMenuUI != null) {
+            // Crafting menu UI might need to recalculate positions
+        }
+        if (hotbarUI != null) {
+            // Hotbar UI might need to recalculate positions
+        }
     }
 }

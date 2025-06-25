@@ -1,25 +1,22 @@
 package com.example.cubearia.game.entities;
 
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.math.Vector3;
 import com.example.cubearia.game.Assets;
-import com.example.cubearia.game.GameScreen;
 import com.example.cubearia.game.world.BlockType;
 import com.example.cubearia.game.world.Chunk;
 import com.example.cubearia.game.world.World;
 
 import static com.example.cubearia.game.GameScreen.TILE_SIZE;
 
+import java.util.List;
+
 /**
  * Ein Spieler‐Entity, das sich um Bewegung, Kollision,
  * Blockabbau/-platzierung und Animation kümmert.
  */
 public class Sheep extends Entity {
-    private final OrthographicCamera camera;
     private Player player;
 
     private float velocityX = 0f;
@@ -58,10 +55,9 @@ public class Sheep extends Entity {
 
     private final World world;
 
-    public Sheep(World world, OrthographicCamera camera, Player player, boolean hasAI) {
-        super(0, Chunk.HEIGHT, 1f * size, 0.875f * size);
+    public Sheep(World world, Player player, boolean hasAI) {
+        super(0, Chunk.HEIGHT, 0.9f * size, 0.875f * size);
         this.world = world;
-        this.camera = camera;
         this.player = player;
         Sheep.hasAI = hasAI;
 
@@ -83,18 +79,39 @@ public class Sheep extends Entity {
         if (hasAI) {
             processAI(delta);
 
+            // Improved movement logic based on target position
             if (aiAction == 0) {
                 left = true;
-            }
-            if (aiAction == 1) {
+            } else if (aiAction == 1) {
                 right = true;
-            }
-            if (aiAction == 2) {
-                targetX = (int) ((player.getX() + player.width / 2) * 16);
-                targetY = (int) ((player.getY() + player.height * 9/10) * 16);
+            } else if (aiAction == 2) {
+                // Look around or at player - no movement
+            } else if (aiAction == 3) {
+                // Eating - no movement
+            } else {
+                // Smart movement towards target
+                float targetWorldX = targetX / 16f;
+                float targetWorldY = targetY / 16f;
+
+                float dx = targetWorldX - x;
+                float dy = targetWorldY - y;
+                float distance = (float) Math.sqrt(dx * dx + dy * dy);
+
+                if (distance > 0.5f) { // Only move if target is far enough
+                    // Determine movement direction
+                    if (Math.abs(dx) > 0.3f) {
+                        if (dx > 0) {
+                            right = true;
+                        } else {
+                            left = true;
+                        }
+                    }
+                }
             }
 
-            if (canJumpOverObstacle(left, right)) jump = true;
+            if (((left || right) && isBlockInFront(left, right)) || isInFluid(world)) {
+                jump = true;
+            }
         }
 
         checkFluidState();
@@ -120,10 +137,9 @@ public class Sheep extends Entity {
         }
 
         float maxSpeed = onGround ? finalmaxSpeed : inFluid ? finalmaxSpeed * 0.5f : finalmaxSpeed * 1.2f;
-        // maxSpeed = ((facingLeft) == (left)) ? maxSpeed : maxSpeed * 0.5f;
         velocityX = MathUtils.clamp(velocityX, -maxSpeed, maxSpeed);
 
-        if ((jump)) {
+        if (jump) {
             if (onGround) {
                 velocityY = jumpVelocity;
                 onGround = false;
@@ -134,11 +150,7 @@ public class Sheep extends Entity {
 
         if (inFluid) {
             velocityY += gravity * 0.2f * delta;
-            if (world.getBlock((int) x, Math.round(y + 0.25f)) == BlockType.WATER) {
-                velocityY = MathUtils.clamp(velocityY, -3f, 3f);
-            } else {
-                velocityY = MathUtils.clamp(velocityY, -3f, 3f);
-            }
+            velocityY = MathUtils.clamp(velocityY, -3f, 3f);
         } else {
             velocityY += gravity * delta;
         }
@@ -185,24 +197,88 @@ public class Sheep extends Entity {
         int endY   = (int)Math.ceil(y + height);
         for (int tx = startX; tx < endX; tx++) {
             for (int ty = startY; ty < endY; ty++) {
-                if (world.getBlock(tx, ty).isSolid()) return true;
+                if (world.getBlock(tx, ty, 0).isSolid()) return true;
             }
         }
         return false;
     }
 
-    private boolean canJumpOverObstacle(boolean left, boolean right) {
+    private boolean isBlockInFront(boolean left, boolean right) {
         int dir = right ? 1 : (left ? -1 : 0);
-        int tx = (int) ((x + width / 2)) + dir;
-        int ty = (int) (y);
-        return world.getBlock(tx, ty).isSolid()
-            && !world.getBlock(tx, ty + 1).isSolid()
-            && !world.getBlock(tx, ty + 2).isSolid();
+        if (dir == 0) return false;
+
+        int tx = (int) (x + width / 2) + dir;
+        int ty = (int) y;
+
+        // Check if there's a solid block in front
+        if (!world.getBlock(tx, ty, 0).isSolid()) {
+            return false;
+        }
+
+        // Check if there's space above to jump over (1 block high is enough for sheep)
+        if (world.getBlock(tx, ty + 1, 0).isSolid()) {
+            return false;
+        }
+
+        // Only jump if we're on ground
+        return onGround;
     }
 
+    private boolean shouldLookAtPlayer() {
+        float distanceToPlayer = getDistanceToPlayer();
+        // Much more frequent observation when player is nearby
+        return distanceToPlayer < 20f && distanceToPlayer > 1f && Math.random() < 0.6;
+    }
+
+    private void lookAtPlayer() {
+        aiAction = 2; // Look around action, but we'll override the target
+        aiActionTimer = 1.5f + (float) Math.random() * 2f; // Shorter but more frequent observations
+
+        // Set target to player position for head rotation
+        targetX = (int) (player.getX() * 16);
+        targetY = (int) (player.getY() * 16);
+    }
 
     private void checkFluidState() {
-        inFluid = world.getBlock((int) x, (int) y).isFluid();
+        inFluid = isInFluid(world);
+    }
+
+    /**
+     * Findet die Wasseroberfläche über dem Schaf
+     * Gibt die Y-Koordinate der Wasseroberfläche zurück
+     */
+    private float findWaterSurface() {
+        int currentY = (int) y;
+
+        // Suche nach oben bis zur Wasseroberfläche
+        for (int y = currentY; y < 512; y++) {
+            if (!world.getBlock((int) x, y, 1).isFluid()) {
+                // Wir haben die Wasseroberfläche gefunden
+                return y - 0.1f; // Etwas unter der Oberfläche
+            }
+        }
+
+        // Fallback: Aktuelle Position
+        return currentY;
+    }
+
+    /**
+     * Schwimmt zur Wasseroberfläche
+     */
+    private void swimToSurface(float delta) {
+        float waterSurface = findWaterSurface();
+        float distanceToSurface = waterSurface - y;
+
+        if (distanceToSurface > 0.5f) {
+            // Schwimme zur Oberfläche
+            velocityY += 2.0f * delta;
+        } else if (distanceToSurface < -0.5f) {
+            // Zu hoch über der Oberfläche, sinke etwas
+            velocityY -= 1.0f * delta;
+        } else {
+            // An der Oberfläche, halte Position
+            velocityY *= 0.9f; // Dämpfung
+        }
     }
 
     public float getX() {
@@ -231,16 +307,23 @@ public class Sheep extends Entity {
 
         // Kopf
         float headX = baseX + (headFlip ? (bodyRegion.getRegionHeight() * 3) / 4f : (bodyRegion.getRegionHeight() * -3) / 4f);
-        float headY = (baseY + headRegion.getRegionHeight() * 1/2f * scale - offsetY) + 10;
+        float headY = (baseY + headRegion.getRegionHeight() / 2f * scale - offsetY) + 10;
         float originX = headRegion.getRegionWidth() * scale;
         float originY = headRegion.getRegionHeight() / 2f * scale;
         float pivotX = headX + originX;
         float pivotY = headY + originY;
 
         // Winkel zu globalen Koordinaten targetX, targetY:
-        float angleRad = MathUtils.atan2(targetY - pivotY, targetX - pivotX);
-        float angleDeg = angleRad * MathUtils.radiansToDegrees;
-        float finalAngle = headFlip ? angleDeg : 180f + angleDeg;
+        float angleDeg;
+        float finalAngle;
+        if (aiAction == 3) {
+            angleDeg = (MathUtils.sin(stateTime * 15) * 20) + 35;
+            finalAngle = headFlip ? angleDeg + 90 : angleDeg;
+        } else {
+            float angleRad = MathUtils.atan2(targetY - pivotY, targetX - pivotX);
+            angleDeg = angleRad * MathUtils.radiansToDegrees;
+            finalAngle = headFlip ? angleDeg : 180f + angleDeg;
+        }
 
         batch.draw(
             headRegion,
@@ -271,11 +354,10 @@ public class Sheep extends Entity {
 
         // Linkes Bein
         float leftLegX = baseX + (headFlip ? (bodyRegion.getRegionWidth() / 1.5f) * scale : 1);
-        float legY = baseY;
 
         batch.draw(
             leftlegRegion,
-            leftLegX, legY,
+            leftLegX, baseY,
             (float) leftlegRegion.getRegionWidth() / 2 * scale, (leftlegRegion.getRegionHeight() * 3f / 4f) * scale,
             leftlegRegion.getRegionWidth() * scale, leftlegRegion.getRegionHeight() * scale,
             dir, 1f,
@@ -287,7 +369,7 @@ public class Sheep extends Entity {
 
         batch.draw(
             rightlegRegion,
-            rightLegX, legY,
+            rightLegX, baseY,
             (float) rightlegRegion.getRegionWidth() / 2 * scale, (rightlegRegion.getRegionHeight() * 3f / 4f) * scale,
             rightlegRegion.getRegionWidth() * scale, rightlegRegion.getRegionHeight() * scale,
             dir, 1f,
@@ -297,27 +379,234 @@ public class Sheep extends Entity {
 
     private void processAI(float delta) {
         aiActionTimer -= delta;
-        System.out.println(aiActionTimer);
 
-        facingLeft = ((float) targetX / 16) < (x + width / 2);
+        // Update facing direction based on movement
+        if (velocityX != 0) {
+            facingLeft = velocityX < 0;
+        }
 
         if (aiActionTimer <= 0) {
-            if (player.isInRange((int) x, (int) y)) {
-                randomStroll(delta, 3);
+            // Check for different behaviors in priority order
+            if (shouldFleeFromPlayer()) {
+                fleeFromPlayer();
+            } else if (shouldLookAtPlayer()) {
+                lookAtPlayer();
+            } else if (shouldSeekFood()) {
+                seekFood();
+            } else if (shouldFollowHerd()) {
+                followHerd();
+            } else if (shouldEat()) {
+                eat();
             } else {
-                randomStroll(delta, 2);
+                randomStroll(delta, 3);
             }
 
+            // Set target positions for movement
             if (aiActionTimer > 0) {
-                if (aiAction == 0) {
+                if (aiAction == 0) { // Move left
                     targetX = (int) ((x - (10 + Math.random() * 30)) * 16);
                     targetY = (int) ((y + (5 - (Math.random() * 10))) * 16);
-                } else if (aiAction == 1) {
+                } else if (aiAction == 1) { // Move right
                     targetX = (int) ((x + (10 + Math.random() * 30)) * 16);
                     targetY = (int) ((y + (5 - (Math.random() * 10))) * 16);
+                } else if (aiAction == 2) { // Look around or at player
+                    // Target is already set by the specific behavior
+                    if (targetX == 0 && targetY == 0) {
+                        targetX = (int) ((x + (Math.random() - 0.5) * 20) * 16);
+                        targetY = (int) ((y + (Math.random() - 0.5) * 20) * 16);
+                    }
+                } else if (aiAction == 3) { // Eating animation
+                    targetX = (int) ((x) * 16);
+                    targetY = (int) ((y) * 16);
                 }
             }
         }
+    }
+
+    /**
+     * Checks if the sheep should flee from the player
+     */
+    private boolean shouldFleeFromPlayer() {
+        if (!player.isInRange((int) x, (int) y)) {
+            return false;
+        }
+
+        float distanceToPlayer = getDistanceToPlayer();
+        return distanceToPlayer < 8f; // Flee if player is within 8 blocks
+    }
+
+    /**
+     * Makes the sheep flee from the player
+     */
+    private void fleeFromPlayer() {
+        float playerX = player.getX();
+        float playerY = player.getY();
+
+        // Calculate direction away from player
+        float dx = x - playerX;
+        float dy = y - playerY;
+        float distance = (float) Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > 0) {
+            // Normalize and scale to flee distance
+            dx = (dx / distance) * 20f;
+            dy = (dy / distance) * 10f;
+
+            // Set target away from player
+            targetX = (int) ((x + dx) * 16);
+            targetY = (int) ((y + dy) * 16);
+
+            // Set movement direction
+            aiAction = dx < 0 ? 0 : 1; // 0 = left, 1 = right
+            aiActionTimer = 2f + (float) Math.random() * 3f;
+        }
+    }
+
+    /**
+     * Checks if the sheep should seek food (grass blocks)
+     */
+    private boolean shouldSeekFood() {
+        // Check if there's grass nearby
+        for (int dx = -5; dx <= 5; dx++) {
+            for (int dy = -3; dy <= 3; dy++) {
+                int checkX = (int) x + dx;
+                int checkY = (int) y + dy;
+                if (world.getBlock(checkX, checkY, 0) == BlockType.GRASSBLOCK) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Makes the sheep seek nearby grass blocks
+     */
+    private void seekFood() {
+        float closestDistance = Float.MAX_VALUE;
+        int closestX = 0, closestY = 0;
+
+        // Find closest grass block
+        for (int dx = -8; dx <= 8; dx++) {
+            for (int dy = -5; dy <= 5; dy++) {
+                int checkX = (int) x + dx;
+                int checkY = (int) y + dy;
+                if (world.getBlock(checkX, checkY, 0) == BlockType.GRASSBLOCK) {
+                    float distance = (float) Math.sqrt(dx * dx + dy * dy);
+                    if (distance < closestDistance) {
+                        closestDistance = distance;
+                        closestX = checkX;
+                        closestY = checkY;
+                    }
+                }
+            }
+        }
+
+        if (closestDistance < Float.MAX_VALUE) {
+            targetX = (int) (closestX * 16);
+            targetY = (int) (closestY * 16);
+
+            // Set movement direction
+            aiAction = closestX < x ? 0 : 1; // 0 = left, 1 = right
+            aiActionTimer = 1f + (float) Math.random() * 2f;
+        }
+    }
+
+    /**
+     * Checks if the sheep should follow other sheep (herd behavior)
+     */
+    private boolean shouldFollowHerd() {
+        List<Entity> entities = world.getEntities();
+        int nearbySheep = 0;
+        float avgX = 0, avgY = 0;
+
+        for (Entity e : entities) {
+            if (e instanceof Sheep && e != this) {
+                float distance = getDistanceToEntity(e);
+                if (distance < 15f) { // Within 15 blocks
+                    nearbySheep++;
+                    avgX += e.getX();
+                    avgY += e.getY();
+                }
+            }
+        }
+
+        if (nearbySheep > 0) {
+            avgX /= nearbySheep;
+            avgY /= nearbySheep;
+
+            // Move towards herd center if not too close
+            float distanceToHerd = (float) Math.sqrt((x - avgX) * (x - avgX) + (y - avgY) * (y - avgY));
+            return distanceToHerd > 5f && distanceToHerd < 20f;
+        }
+
+        return false;
+    }
+
+    /**
+     * Makes the sheep follow the herd
+     */
+    private void followHerd() {
+        List<Entity> entities = world.getEntities();
+        float avgX = 0, avgY = 0;
+        int count = 0;
+
+        for (Entity e : entities) {
+            if (e instanceof Sheep && e != this) {
+                float distance = getDistanceToEntity(e);
+                if (distance < 15f) {
+                    avgX += e.getX();
+                    avgY += e.getY();
+                    count++;
+                }
+            }
+        }
+
+        if (count > 0) {
+            avgX /= count;
+            avgY /= count;
+
+            targetX = (int) (avgX * 16);
+            targetY = (int) (avgY * 16);
+
+            aiAction = avgX < x ? 0 : 1; // 0 = left, 1 = right
+            aiActionTimer = 1.5f + (float) Math.random() * 2f;
+        }
+    }
+
+    /**
+     * Checks if the sheep should eat (standing on grass)
+     */
+    private boolean shouldEat() {
+        return world.getBlock((int) x, (int) (y - 1), 0) == BlockType.GRASSBLOCK && Math.random() <= 0.15;
+    }
+
+    /**
+     * Makes the sheep eat (standing still animation)
+     */
+    private void eat() {
+        aiAction = 3; // Eating animation
+        aiActionTimer = 3f + (float) Math.random() * 2f;
+        targetX = (int) (x * 16);
+        targetY = (int) (y * 16);
+    }
+
+    /**
+     * Gets distance to player
+     */
+    private float getDistanceToPlayer() {
+        float dx = x - player.getX();
+        float dy = y - player.getY();
+        return (float) Math.sqrt(dx * dx + dy * dy);
+    }
+
+    /**
+     * Gets distance to another entity
+     */
+    private float getDistanceToEntity(Entity entity) {
+        float dx = x - entity.getX();
+        float dy = y - entity.getY();
+        return (float) Math.sqrt(dx * dx + dy * dy);
     }
 
     /**

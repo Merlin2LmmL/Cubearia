@@ -1,6 +1,5 @@
 package com.example.cubearia.game;
 
-import com.example.cubearia.game.inventory.Inventory;
 import com.example.cubearia.game.world.BiomeType;
 import com.example.cubearia.game.world.Chunk;
 
@@ -15,8 +14,15 @@ public class Settings {
     public static final int         SEA_LEVEL       = Chunk.HEIGHT - 66;
 
     // RENDER SETTINGS
-    public static final boolean     RENDERALLBLOCKS = false;
-    public static int               RENDERDISTANCE  = 1;
+    public static final boolean     USE_RAYCASTING_VISIBILITY = false;
+    public static final boolean     RENDERALLBLOCKS = true;
+    public static final int         MAX_ZOOM        = 32;
+    public static int               RENDERDISTANCE;
+
+    // MOB SPAWNING SETTINGS
+    public static final float       MOB_SPAWN_RATE_PER_SECOND = 0.5f; // How many spawn attempts per second
+    public static final int         MOB_SPAWN_RADIUS = 20; // Radius around player to check for spawn positions
+    public static final int         MAX_MOBS_NEAR_PLAYER = 10; // Maximum mobs within spawn radius
 
     // UI SETTINGS
     public static final float       UISCALE         = 75/100f;

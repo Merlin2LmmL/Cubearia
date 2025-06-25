@@ -5,6 +5,7 @@ import com.example.cubearia.game.Settings;
 
 /**
  * Generiert deterministische Rauschwerte basierend auf dem eingestellten Seed.
+ * Perlin Noise
  */
 public class Noise {
     private static final int SIZE = 4096;

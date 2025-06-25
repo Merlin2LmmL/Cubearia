@@ -4,6 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.example.cubearia.game.Assets;
 import com.example.cubearia.game.Settings;
@@ -20,6 +21,7 @@ import static com.example.cubearia.game.entities.Player.*;
 public class HotbarUI {
     private final Inventory inventory;
     private final Texture slotBackground;
+    private final BitmapFont font;
 
     /**
      * @param inventory      Das Inventory, aus dem die ItemStacks gezogen werden.
@@ -27,6 +29,8 @@ public class HotbarUI {
     public HotbarUI(Inventory inventory) {
         this.inventory      = inventory;
         this.slotBackground = Assets.slotBackground;
+        this.font = new BitmapFont();
+        this.font.getData().setScale(0.8f);
     }
 
     /**
@@ -77,5 +81,44 @@ public class HotbarUI {
                 stack.drawStack(batch, x, startY, slotSize);
             }
         }
+    }
+
+    /**
+     * Zeichnet die Hotbar mit Layer-Information.
+     */
+    public void render(SpriteBatch batch, OrthographicCamera uiCam, Player player) {
+        render(batch, uiCam, player.getSelectedSlot());
+        
+        // Layer-Information anzeigen
+        float vw = uiCam.viewportWidth;
+        float vh = uiCam.viewportHeight;
+        
+        String layerText = "Layer: " + (player.getSelectedLayer() + 1);
+        
+        // Skaliere die Schriftgröße basierend auf der Bildschirmgröße - viel größer
+        float scale = Math.min(vw / 1920f, vh / 1080f) * 2.0f; // Größere Basis-Skalierung
+        font.getData().setScale(scale);
+        
+        float textX = vw * 0.02f; // 2% vom linken Rand
+        float textY = vh * 0.15f; // 15% vom unteren Rand
+        
+        // Berechne die tatsächliche Textgröße
+        float textWidth = font.draw(batch, layerText, 0, 0, 0, 0, false).width;
+        float textHeight = font.getLineHeight();
+        
+        // Hintergrund für bessere Lesbarkeit - größer und prominenter
+        batch.setColor(0f, 0f, 0f, 0.7f); // Dunklerer Hintergrund
+        float padding = 10f * scale; // Mehr Padding
+        batch.draw(Assets.slotBackground, textX - padding, textY - textHeight - padding, 
+                  textWidth + 2 * padding, textHeight + 2 * padding);
+        batch.setColor(1f, 1f, 1f, 1f);
+        
+        // Layer-Text zeichnen - größer und farbiger
+        font.setColor(player.getSelectedLayer() == 0 ? Color.CYAN : Color.ORANGE);
+        font.draw(batch, layerText, textX, textY);
+        font.setColor(1f, 1f, 1f, 1f);
+        
+        // Schriftgröße zurücksetzen
+        font.getData().setScale(0.8f);
     }
 }

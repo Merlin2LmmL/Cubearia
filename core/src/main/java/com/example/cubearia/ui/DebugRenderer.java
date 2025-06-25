@@ -36,9 +36,17 @@ public class DebugRenderer {
     public void render(SpriteBatch batch, Player player, BlockType blockAtCursor, World world) {
         if (!enabled) return;
 
-        // Berechnung der UI-Position relativ zur UI-Kamera (wir nutzen die Skalierung hier)
-        float x = uiPosition.x;
-        float y = uiPosition.y;
+        // Skaliere die Schriftgröße basierend auf der Bildschirmgröße
+        float vw = Gdx.graphics.getWidth();
+        float vh = Gdx.graphics.getHeight();
+        float scale = Math.min(vw / 1920f, vh / 1080f) * 0.7f; // Basis-Skalierung
+        font.getData().setScale(scale);
+
+        // Position ganz oben links
+        float x = 10f * (vw / 1920f); // Skaliere Position
+        float y = vh - 10f * (vh / 1080f); // Ganz oben
+        float lineHeight = font.getLineHeight();
+        
         // Player-Position
         font.draw(batch,
             String.format("Player:  (X=%.2f, Y=%.2f, velX=%.2f, velY=%.2f", player.x, player.y, player.getVelocityX(), player.getVelocityY()),
@@ -48,20 +56,29 @@ public class DebugRenderer {
         // Block-Information
         font.draw(batch,
             String.format("Blocktype: %s", blockAtCursor.name()),
-            x, (y - font.getLineHeight())
+            x, (y - lineHeight)
         );
 
         // FPS unterhalb der ersten Zeile
         font.draw(batch,
             String.format("FPS: %d", Gdx.graphics.getFramesPerSecond()),
-            x, (y - font.getLineHeight() * 2)
+            x, (y - lineHeight * 2)
         );
 
         // BIOME
         font.draw(batch,
             String.format("Biome: %s", world.getBiomeTypeAt((int) player.x)),
-            x, (y - font.getLineHeight() * 3)
+            x, (y - lineHeight * 3)
         );
+
+        // Layer-Information
+        font.draw(batch,
+            String.format("Layer: %d (TAB to switch)", player.getSelectedLayer() + 1),
+            x, (y - lineHeight * 4)
+        );
+        
+        // Schriftgröße zurücksetzen
+        font.getData().setScale(1f);
     }
 
     /** Ressourcen freigeben */

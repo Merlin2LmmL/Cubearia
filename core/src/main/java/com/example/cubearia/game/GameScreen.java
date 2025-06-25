@@ -6,9 +6,9 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
+import com.example.cubearia.game.entities.Entity;
 import com.example.cubearia.game.entities.Player;
 import com.example.cubearia.game.entities.DroppedItem;
-import com.example.cubearia.game.entities.Sheep;
 import com.example.cubearia.game.inventory.Inventory;
 import com.example.cubearia.game.inventory.ItemRegistry;
 import com.example.cubearia.game.world.BlockType;
@@ -31,7 +31,6 @@ public class GameScreen implements Screen {
 
     private World world;
     private Player localPlayer;
-    private Sheep sheep;
     private Inventory inventory;
     private UIManager uiManager;
 
@@ -40,7 +39,6 @@ public class GameScreen implements Screen {
     private final float CAMERA_LERP     = 8;
     private final float MAX_DISTANCE    = 8 * TILE_SIZE;
     private final float CAMERA_OFFSET_Y = 2f * TILE_SIZE;
-    private int max_zoom;
 
     @Override
     public void show() {
@@ -60,10 +58,42 @@ public class GameScreen implements Screen {
         inventory = new Inventory(9, 4);
         localPlayer = new Player(world, camera, inventory);
         world.addEntity(localPlayer);
-        sheep = new Sheep(world, camera, localPlayer, true);
-        world.addEntity(sheep);
         uiManager = new UIManager(localPlayer, uiCamera, world, inventory);
-        max_zoom = Settings.DEBUG ? 80 : 10;
+        
+        // Set up input processor once
+        Gdx.input.setInputProcessor(new InputAdapter() {
+            @Override
+            public boolean scrolled(float amountX, float amountY) {
+                camera.zoom = MathUtils.clamp(
+                    camera.zoom + amountY * camera.zoom * 0.5f,
+                    0.1f, Settings.MAX_ZOOM
+                );
+                return true;
+            }
+            @Override
+            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+                // Prevent block breaking when clicking on title bar area (top 30 pixels)
+                if (screenY < 30) {
+                    return false; // Let the window handle the click
+                }
+                uiManager.pressClick(screenX, screenY, button);
+                return true;
+            }
+            @Override
+            public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+                // Prevent block breaking when clicking on title bar area
+                if (screenY < 30) {
+                    return false; // Let the window handle the click
+                }
+                uiManager.releaseClick(screenX, screenY, button);
+                return true;
+            }
+            @Override
+            public boolean touchDragged(int screenX, int screenY, int pointer) {
+                uiManager.updateMousePosition(screenX, screenY);
+                return true;
+            }
+        });
     }
 
     private void update(float delta) {
@@ -97,32 +127,15 @@ public class GameScreen implements Screen {
             camPos.y = targetY + (float)Math.sin(angle) * MAX_DISTANCE;
         }
 
-        // 3) Input‐Processor für Zoom & UI
-        Gdx.input.setInputProcessor(new InputAdapter() {
-            @Override
-            public boolean scrolled(float amountX, float amountY) {
-                camera.zoom = MathUtils.clamp(
-                    camera.zoom + amountY * camera.zoom * 0.5f,
-                    0.1f, max_zoom
-                );
-                return true;
+        // Window management shortcuts
+        if (Gdx.input.isKeyJustPressed(Input.Keys.F11)) {
+            // Toggle fullscreen
+            if (Gdx.graphics.isFullscreen()) {
+                Gdx.graphics.setWindowedMode(1280, 720);
+            } else {
+                Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
             }
-            @Override
-            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-                uiManager.pressClick(screenX, screenY, button);
-                return true;
-            }
-            @Override
-            public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-                uiManager.releaseClick(screenX, screenY, button);
-                return true;
-            }
-            @Override
-            public boolean touchDragged(int screenX, int screenY, int pointer) {
-                uiManager.updateMousePosition(screenX, screenY);
-                return true;
-            }
-        });
+        }
 
         Settings.RENDERDISTANCE = (int) (camera.zoom * 0.9f + 1f);
 
@@ -145,7 +158,7 @@ public class GameScreen implements Screen {
 
         // 4) Alle Spieler‐Entitäten abarbeiten und ggf. Drops sammeln
         List<DroppedItem> toAdd = new ArrayList<>();
-        for (com.example.cubearia.game.entities.Entity e : world.getEntities()) {
+        for (Entity e : world.getEntities()) {
             if (e instanceof Player) {
                 Player p = (Player) e;
                 if (!p.inMenu) {
@@ -178,11 +191,18 @@ public class GameScreen implements Screen {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
 
-        new Renderer().renderWorld(world, localPlayer, batch, camera);
+        Renderer renderer = new Renderer();
+        // 1) Sichtbarkeit berechnen
+        renderer.computeVisibility(world, localPlayer);
 
+        renderer.renderWorld(world, localPlayer, batch, camera);
+
+        // 3) Spieler und Entities rendern
         for (com.example.cubearia.game.entities.Entity e : world.getEntities()) {
             if (e instanceof Player) {
                 Player p = (Player) e;
+                // hier zeichnest du Spieler-Sprite etc.
+                // Breaking-Animation:
                 if (p.isBreaking()) {
                     TextureRegion frame = p.getBreakingFrame();
                     int bx = p.getBreakingX();
@@ -197,14 +217,13 @@ public class GameScreen implements Screen {
                 }
             }
         }
-
         world.renderEntities(batch);
 
         world.renderParticles(batch);
 
         batch.end();
 
-        // 4) UI‐Schicht (Inventar, Crafting etc.) nur für localPlayer
+        // UI‐Schicht
         batch.setProjectionMatrix(uiCamera.combined);
         batch.begin();
         uiManager.render(batch);
@@ -212,12 +231,33 @@ public class GameScreen implements Screen {
         batch.end();
     }
 
+
     @Override
     public void resize(int width, int height) {
+        // Store current camera position and zoom
+        float oldZoom = camera.zoom;
+        Vector3 oldPosition = new Vector3(camera.position);
+        
+        // Update UI camera to match new window size
+        uiCamera.setToOrtho(false, width, height);
+
+        // Update game camera to maintain aspect ratio
         int tilesVisibleY = 30;
         int tilesVisibleX = (int)(tilesVisibleY * (float)width / height);
         camera.setToOrtho(false, tilesVisibleX * TILE_SIZE, tilesVisibleY * TILE_SIZE);
-        uiCamera.setToOrtho(false, width, height);
+        
+        // Restore camera position and zoom to prevent entity position shifts
+        camera.zoom = oldZoom;
+        camera.position.set(oldPosition);
+        camera.update();
+
+        // Update UI manager with new dimensions
+        if (uiManager != null) {
+            uiManager.resize(width, height);
+        }
+
+        // Update render distance based on new window size
+        Settings.RENDERDISTANCE = Math.max(8, (int) (camera.zoom * 0.9f + 1f));
     }
 
     @Override public void pause() {}

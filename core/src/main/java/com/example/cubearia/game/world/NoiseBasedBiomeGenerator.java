@@ -19,7 +19,7 @@ public class NoiseBasedBiomeGenerator implements BiomeGenerator {
                 .map(BiomeType::getGroup)
                 .orElse(BiomeType.BiomeGroup.STANDARD);
 
-            // Innerhalb dieser Gruppe Biome mit bestmöglicher Temperatur wählen
+            // Innerhalb dieser Gruppe Biom mit bestmöglicher Temperatur wählen
             return Arrays.stream(BiomeType.values())
                 .filter(b -> b.getGroup() == bestGroup)
                 .min(Comparator.comparingDouble(b -> Math.abs(b.getTemperatureValue() - temperatureNoise)))

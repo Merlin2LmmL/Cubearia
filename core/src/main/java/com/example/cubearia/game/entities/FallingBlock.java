@@ -36,7 +36,7 @@ public class FallingBlock extends Entity {
 
         if (inFluid) {
             velocityY += gravity * 0.2f * delta; // weniger Gravitation im Wasser
-            if (world.getBlock((int) x, (int) (Math.round(y + 0.25f))) == BlockType.WATER) {
+            if (world.getBlock((int) x, (int) (Math.round(y + 0.25f)), 1) == BlockType.WATER) {
                 velocityY = MathUtils.clamp(velocityY, -3f, 3f); // nicht zu schnell fallen
             } else {
                 velocityY = MathUtils.clamp(velocityY, -3f, 3f); // nicht zu schnell fallen
@@ -116,7 +116,7 @@ public class FallingBlock extends Entity {
     }
 
     private void checkFluidState() {
-        inFluid = world.getBlock((int) x, (int) y).isFluid();
+        inFluid = isInFluid(world);
     }
 
     private void applyFriction(float frictionAmount) {
